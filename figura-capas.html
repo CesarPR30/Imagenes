@@ -50,6 +50,7 @@ button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
   <main id="stage"><canvas id="fig"></canvas></main>
 </div>
 <div id="dims"></div>
+<script src="svgctx.js"></script>
 <script>
 "use strict";
 // ───────────────────────── estado ─────────────────────────
@@ -88,7 +89,7 @@ const DEFAULTS = {
   segMin:1.2, segMax:6.5, segNorm:'count',
   subQ:0.35, haloW:20, haloAlpha:0.45, topoContext:true,
   labels:'left', labelW:150, lang:'en', prefix:true, font:'Georgia', fontSize:14, labelColor:'#222222', legend:true,
-  bg:'#ffffff', transparent:false, exportScale:'4',
+  bg:'#ffffff', transparent:false, exportScale:'4', exportFormat:'png',
 };
 LAYERS.forEach(L => { DEFAULTS['on_'+L.id] = true; DEFAULTS['lbl_'+L.id] = ''; });
 
@@ -100,6 +101,11 @@ try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 // ───────────────────────── utilidades ─────────────────────────
+// Superficie de dibujo: <canvas> en pantalla y PNG; SvgCtx (svgctx.js) al exportar SVG.
+let SVG_MODE = false;
+const surface = (w, h) => SVG_MODE ? new SvgCtx(w, h) : Object.assign(document.createElement('canvas'), {width:w, height:h});
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+
 const $ = s => document.querySelector(s);
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -474,7 +480,7 @@ const DRAW = {
         ctx.fillStyle = css(ramp(f[i]/ST.fMax), .45); ctx.fill(); ctx.strokeStyle = css(mixc(ramp(.4), [0,0,0], .2), .5); ctx.lineWidth = .6*u; ctx.stroke(); });
     }
     if (S.haloW > 0 && sub.length){
-      const hc = document.createElement('canvas'); hc.width = hc.height = T; const h = hc.getContext('2d');
+      const hc = surface(T, T), h = hc.getContext('2d');
       h.setTransform(ctx.getTransform()); h.lineCap = 'round'; h.lineJoin = 'round';
       const hw = S.haloW*u, ol = 1.4*u;
       h.strokeStyle = css(hex(S.c1)); h.lineWidth = hw + 2*ol; sub.forEach(e => { linePath(h, e.pts); h.stroke(); });
@@ -488,7 +494,7 @@ const DRAW = {
   },
 };
 function makeTex(id, v, dispW, T, sym, ins = false){
-  const c = document.createElement('canvas'); c.width = c.height = T;
+  const c = surface(T, T);
   const ctx = c.getContext('2d'), k = T/v.S;
   ctx.setTransform(k, 0, 0, k, -(v.cx - v.S/2)*k, -(v.cy - v.S/2)*k);
   const u = v.S/dispW;
@@ -752,9 +758,10 @@ function schema(){
       ['legend','Leyenda inferior','check',0,1],
     ]],
     ['Exportar', true, [
-      ['exportScale','Escala de exportación','select',[['2','2× (pantalla)'],['3','3×'],['4','4× (≈600 ppp a 8 cm)'],['6','6×']],1],
+      ['exportFormat','Formato','select',[['png','PNG (imagen)'],['svg','SVG (vectorial)']],0],
+      ['exportScale','Escala del PNG','select',[['2','2× (pantalla)'],['3','3×'],['4','4× (≈600 ppp a 8 cm)'],['6','6×']],1,() => S.exportFormat === 'png'],
       ['transparent','Fondo transparente','check',0,0],
-      ['!png','Descargar PNG','button','pri'],
+      ['!png','Descargar figura','button','pri'],
       ['!json','Guardar configuración (.json)','button'],
       ['!load','Cargar configuración…','button'],
       ['!reset','Restablecer valores','button'],
@@ -834,9 +841,15 @@ const ACTIONS = {
     } catch (e) { status('OSM no respondió: ' + e.message, true); }
   },
   png(){
+    if (S.exportFormat === 'svg'){
+      // vectorial: calles, polígonos, círculos y texto; el KDE va embebido como imagen
+      SVG_MODE = true; const sv = new SvgCtx();
+      try { render(sv, 1, true, S.transparent); } finally { SVG_MODE = false; }
+      download(new Blob([sv.toSVG()], {type:'image/svg+xml'}), 'figura_capas.svg'); return;
+    }
     const cv = document.createElement('canvas'), sc = +S.exportScale;
     render(cv, sc, true, S.transparent);
-    cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `figura_capas_${sc}x.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+    cv.toBlob(b => download(b, `figura_capas_${sc}x.png`), 'image/png');
   },
   json(){ const b = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'figura_capas_config.json'; a.click(); },
   load(){

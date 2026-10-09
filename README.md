@@ -7,7 +7,7 @@ Dos editores en una sola página HTML cada uno para generar las figuras del pape
 | [`figura-capas.html`](figura-capas.html) | De eventos a subgrafo: siete representaciones espaciales del mismo crimen apiladas en vertical (eventos, KDE, manzanas censales, grilla, intersecciones, segmentos, subgrafo topo-crimen). |
 | [`figura-temporal.html`](figura-temporal.html) | Evolución temporal de la topología de un hotspot (t₁ → t₂ → … → tₙ₋₁ → tₙ), con recuadros de zoom. |
 
-Las imágenes exportadas están en [`img/`](img/).
+Las imágenes exportadas están en [`img/`](img/), en PNG y en SVG vectorial.
 
 ![Figura de capas](img/figura_capas.png)
 
@@ -30,4 +30,9 @@ python -m http.server 8000
 
 o activar GitHub Pages en *Settings → Pages → Deploy from a branch → main / (root)*.
 
-Todo se ajusta desde el panel lateral (tamaño, separación, rotación e inclinación de los mapas, colores y gradientes, ubicación, radio de los círculos de aglomeración en esquinas, etiquetas) y se exporta con **Descargar PNG** a 2×–6×. La configuración se guarda en el navegador y puede exportarse o cargarse como JSON.
+Todo se ajusta desde el panel lateral (tamaño, separación, rotación e inclinación de los mapas, colores y gradientes, ubicación, radio de los círculos de aglomeración en esquinas, etiquetas) y se exporta con **Descargar figura** en dos formatos:
+
+- **PNG**, a 2×–6× del tamaño en pantalla;
+- **SVG** vectorial: calles, edificios, halos, círculos y texto quedan como trazados editables (Illustrator, Inkscape, LaTeX vía `svg`/`inkscape`). El KDE, que es un campo continuo, va embebido como imagen dentro del SVG.
+
+`svgctx.js` es el puente: implementa la parte de la API de Canvas que usan las páginas y la escribe como SVG, de modo que ambos formatos salen del mismo código de dibujo. La configuración se guarda en el navegador y puede exportarse o cargarse como JSON.

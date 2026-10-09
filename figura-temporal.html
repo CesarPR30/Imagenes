@@ -47,6 +47,7 @@ button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
   <main id="stage"><canvas id="fig"></canvas></main>
 </div>
 <div id="dims"></div>
+<script src="svgctx.js"></script>
 <script>
 "use strict";
 // ───────────────────────── estado ─────────────────────────
@@ -64,7 +65,7 @@ const DEFAULTS = {
   c0:'#fdd0a2', c1:'#f16913', c2:'#8c0b0b', gamma:0.8, preset:'naranja', jointScale:true,
   land:'#ececea', building:'#c9c9c7', street:'#ffffff', avenue:'#ffffff', park:'#b9d9a8', water:'#bcd6ec', streetScale:1, noBldFill:'#d7d7d4',
   font:'Georgia', fontSize:22, labelColor:'#111111', subColor:'#555555',
-  bg:'#ffffff', transparent:false, exportScale:'4',
+  bg:'#ffffff', transparent:false, exportScale:'4', exportFormat:'png',
 };
 const PRESETS = {
   naranja:['#fdd0a2','#f16913','#8c0b0b'], rojos:['#fde0c5','#f26b3a','#9e0b0f'], magma:['#fcf1b4','#f1605d','#3b0f70'],
@@ -78,6 +79,11 @@ try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
 
 // ───────────────────────── utilidades ─────────────────────────
+// Superficie de dibujo: <canvas> en pantalla y PNG; SvgCtx (svgctx.js) al exportar SVG.
+let SVG_MODE = false;
+const surface = (w, h) => SVG_MODE ? new SvgCtx(w, h) : Object.assign(document.createElement('canvas'), {width:w, height:h});
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+
 const $ = s => document.querySelector(s);
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const hex = h => { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; };
@@ -180,7 +186,7 @@ function drawMonth(ctx, month, v, u, ins, T2){
   // subgrafo Topocrime: halo (zona de influencia), aristas coloreadas por densidad
   const sub = T.edges.filter(e => d.hot.has(e.u) && d.hot.has(e.v));
   if (sub.length && S.haloM > 0){
-    const hc = document.createElement('canvas'); hc.width = T2[0]; hc.height = T2[1]; const h = hc.getContext('2d');
+    const hc = surface(T2[0], T2[1]), h = hc.getContext('2d');
     h.setTransform(ctx.getTransform()); h.lineCap = 'round'; h.lineJoin = 'round';
     const hw = S.haloM, ol = 1.6*u, col = hex(S.haloColor);
     if (S.haloOutline){ h.strokeStyle = css(mixc(col, [0,0,0], .15)); h.lineWidth = hw + 2*ol; sub.forEach(e => { linePath(h, e.pts); h.stroke(); }); }
@@ -221,7 +227,7 @@ function drawMonth(ctx, month, v, u, ins, T2){
 }
 function makeTex(month, v, dispW, dispH, scale, ins){
   const Tw = Math.min(4096, Math.ceil(dispW*scale*1.3)), Th = Math.min(4096, Math.ceil(dispH*scale*1.3));
-  const c = document.createElement('canvas'); c.width = Tw; c.height = Th;
+  const c = surface(Tw, Th);
   const ctx = c.getContext('2d'), k = Tw/v.w;
   ctx.setTransform(k, 0, 0, Th/v.h, -(v.cx - v.w/2)*k, -(v.cy - v.h/2)*Th/v.h);
   drawMonth(ctx, month, v, v.w/dispW, ins, [Tw, Th]);
@@ -258,7 +264,7 @@ function geom(){
 }
 const quad = (G, cx) => [[0,0],[1,0],[1,1],[0,1]].map(([u, v]) => G.P(cx, u, v));
 function pathPts(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
-function rrect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+function rrect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r); ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h); ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r); ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y); ctx.closePath(); }
 
 let cache = {ver:-1, scale:0, main:{}, ins:{}}, ver = 0;
 function render(canvas, scale, fresh, transparent){
@@ -421,9 +427,10 @@ function schema(){
       ['subColor','Color del mes','color',0,1],
     ]],
     ['Exportar', true, [
-      ['exportScale','Escala de exportación','select',[['2','2×'],['3','3×'],['4','4×'],['6','6×']],1],
+      ['exportFormat','Formato','select',[['png','PNG (imagen)'],['svg','SVG (vectorial)']],0],
+      ['exportScale','Escala del PNG','select',[['2','2×'],['3','3×'],['4','4×'],['6','6×']],1],
       ['transparent','Fondo transparente','check',0,0],
-      ['!png','Descargar PNG','button','pri'],
+      ['!png','Descargar figura','button','pri'],
       ['!json','Guardar configuración (.json)','button'],
       ['!load','Cargar configuración…','button'],
       ['!reset','Restablecer valores','button'],
@@ -479,8 +486,13 @@ const ACTIONS = {
   auto(){ defaultMonths(); buildControls(); invalidate(2); },
   center(){ centerOn(); syncInputs(); invalidate(2); },
   png(){
+    if (S.exportFormat === 'svg'){
+      SVG_MODE = true; const sv = new SvgCtx();
+      try { render(sv, 1, true, S.transparent); } finally { SVG_MODE = false; }
+      download(new Blob([sv.toSVG()], {type:'image/svg+xml'}), `figura_temporal_${T.id}.svg`); return;
+    }
     const cv = document.createElement('canvas'), sc = +S.exportScale; render(cv, sc, true, S.transparent);
-    cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `figura_temporal_${T.id}_${sc}x.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+    cv.toBlob(b => download(b, `figura_temporal_${T.id}_${sc}x.png`), 'image/png');
   },
   json(){ const b = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'figura_temporal_config.json'; a.click(); },
   load(){ const i = document.createElement('input'); i.type = 'file'; i.accept = '.json'; i.onchange = async () => { try { Object.assign(S, JSON.parse(await i.files[0].text())); save(); pickTraj(false); invalidate(3); } catch (e) { status('Configuración inválida', true); } }; i.click(); },
