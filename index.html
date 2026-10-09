@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figuras Topocrime</title>
+<style>
+:root{--bg:#f6f6f4;--card:#ffffff;--ink:#1f2328;--muted:#667085;--line:#e3e6ea;--acc:#b4161d}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--card:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c}}
+:root[data-theme="dark"]{--bg:#15171a;--card:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Georgia,serif}
+main{max-width:1100px;margin:0 auto;padding:40px 16px 60px}
+h1{font-size:28px;margin:0 0 6px}
+p.lead{color:var(--muted);margin:0 0 28px;max-width:720px}
+.grid{display:grid;grid-template-columns:1fr 1.6fr;gap:20px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+a.card{display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;color:inherit;text-decoration:none}
+a.card:hover{border-color:var(--acc)}
+.card h2{font-size:18px;margin:0 0 4px}
+.card p{color:var(--muted);font-size:13.5px;margin:0 0 12px;font-family:system-ui,sans-serif}
+.card img{width:100%;border-radius:6px;border:1px solid var(--line);background:#fff}
+.go{color:var(--acc);font-family:system-ui,sans-serif;font-size:13px;font-weight:600}
+</style>
+</head>
+<body>
+<main>
+  <h1>Figuras del método Topocrime</h1>
+  <p class="lead">Dos editores para generar las figuras del paper con datos reales de Lima (red vial de OpenStreetMap, denuncias geocodificadas y subgrafos del pipeline). Cada página permite ajustar geometría, colores, ubicación y símbolos, y exporta un PNG en alta resolución.</p>
+  <div class="grid">
+    <a class="card" href="figura-capas.html">
+      <h2>De eventos a subgrafo</h2>
+      <p>Siete representaciones espaciales del mismo crimen, apiladas en vertical: eventos, KDE, manzanas censales, grilla, intersecciones, segmentos y subgrafo topo-crimen.</p>
+      <img src="img/figura_capas.png" alt="Siete láminas apiladas que muestran el mismo conjunto de delitos agregados de siete maneras distintas" loading="lazy">
+      <p class="go" style="margin-top:10px">Abrir el editor →</p>
+    </a>
+    <a class="card" href="figura-temporal.html">
+      <h2>Evolución temporal de un hotspot</h2>
+      <p>La topología del subgrafo de una misma zona a lo largo de los meses (t₁ → t₂ → … → tₙ), con zoom y círculos por aglomeración en esquinas.</p>
+      <img src="img/figura_temporal.png" alt="Cuatro mapas inclinados en fila con el subgrafo del hotspot en meses sucesivos" loading="lazy">
+      <p class="go" style="margin-top:10px">Abrir el editor →</p>
+    </a>
+  </div>
+</main>
+</body>
+</html>

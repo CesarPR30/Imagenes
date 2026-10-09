@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evolución temporal del hotspot</title>
+<style>
+:root{--bg:#f3f4f6;--panel:#ffffff;--ink:#1f2328;--muted:#667085;--line:#e3e6ea;--acc:#b4161d;--stage:#d9dce1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--panel:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c;--stage:#0e0f11}}
+:root[data-theme="dark"]{--bg:#15171a;--panel:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c;--stage:#0e0f11}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{display:flex;height:100vh}
+#side{width:370px;min-width:370px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 14px 40px}
+#side h1{font-size:16px;margin:2px 0 2px}
+#side .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+#side a{color:var(--acc)}
+details{border-top:1px solid var(--line);padding:6px 0}
+summary{cursor:pointer;font-weight:600;padding:4px 0;list-style:none}
+summary::before{content:"▸ ";color:var(--muted)}
+details[open]>summary::before{content:"▾ "}
+.row{display:grid;grid-template-columns:150px 1fr 44px;gap:6px;align-items:center;margin:4px 0}
+.row label{color:var(--muted);font-size:12px}
+.row input[type=range]{width:100%}
+.row input[type=number],.row input[type=text],.row select{width:100%;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);font:inherit}
+.row .val{font-variant-numeric:tabular-nums;font-size:11px;color:var(--muted);text-align:right}
+.row.wide{grid-template-columns:150px 1fr}
+.head{margin:12px 0 4px;font-weight:600;font-size:12px;color:var(--acc)}
+button{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;width:100%;margin:3px 0}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+.info{font-size:11.5px;color:var(--muted);background:var(--bg);border-radius:6px;padding:6px 8px;margin:4px 0 8px}
+#status{font-size:12px;margin:6px 0;color:var(--muted);min-height:16px}
+#stage{flex:1;overflow:auto;background:var(--stage);display:flex;align-items:flex-start;justify-content:center;padding:18px}
+#fig{background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.18);max-width:100%;height:auto}
+#dims{position:fixed;right:14px;bottom:10px;font-size:11px;color:var(--muted);background:var(--panel);padding:3px 8px;border-radius:5px;border:1px solid var(--line)}
+@media (max-width:800px){#app{flex-direction:column;height:auto}#side{width:100%;min-width:0;border-right:0}#stage{padding:16px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>Evolución temporal de un hotspot</h1>
+    <div class="sub">La topología del subgrafo Topocrime de una misma zona, mes a mes. <a href="figura-capas.html">Ir a la figura de capas →</a></div>
+    <div id="status"></div>
+    <div id="controls"></div>
+  </aside>
+  <main id="stage"><canvas id="fig"></canvas></main>
+</div>
+<div id="dims"></div>
+<script>
+"use strict";
+// ───────────────────────── estado ─────────────────────────
+const DEFAULTS = {
+  traj:0, nPanels:4, labelMode:'tn', monthSub:true, months:[],
+  viewSize:480, viewX:0, viewY:0, zoomSize:220, zoomDX:0, zoomDY:0,
+  W:330, rot:45, tilt:0.58, gap:80, thick:7, shadow:0.6, frameColor:'#5b6573', slabColor:'#d9dbde',
+  arrowLen:34, arrowColor:'#5b6573', arrowW:2.4, arrowDY:40, ellipsis:false,
+  inset:true, insetW:250, insetH:200, insetGap:34, insetRadius:7, insetSym:1.5, zoomFrame:true,
+  haloM:30, haloColor:'#f7862f', haloAlpha:0.55, haloOutline:true,
+  lineMin:1.5, lineMax:5, showHotNodes:false,
+  ptMode:'both', crimeColor:'#b3131b', crimeR:2.1, crimeRI:3.2, crimeAlpha:0.9, spread:6, outsideAlpha:0.55,
+  snapR:45, cScale:'sqrt', cMinCount:2, cRef:0,
+  cMin:2.5, cMax:9, cMinI:4, cMaxI:16, cColorMode:'ramp', cStroke:true, cLabels:false, cLabelMin:5,
+  c0:'#fdd0a2', c1:'#f16913', c2:'#8c0b0b', gamma:0.8, preset:'naranja', jointScale:true,
+  land:'#ececea', building:'#c9c9c7', street:'#ffffff', avenue:'#ffffff', park:'#b9d9a8', water:'#bcd6ec', streetScale:1, noBldFill:'#d7d7d4',
+  font:'Georgia', fontSize:22, labelColor:'#111111', subColor:'#555555',
+  bg:'#ffffff', transparent:false, exportScale:'4',
+};
+const PRESETS = {
+  naranja:['#fdd0a2','#f16913','#8c0b0b'], rojos:['#fde0c5','#f26b3a','#9e0b0f'], magma:['#fcf1b4','#f1605d','#3b0f70'],
+  viridis:['#fde725','#21918c','#440154'], azules:['#d6e6f4','#4a98c9','#08306b'], grises:['#e3e3e3','#8c8c8c','#1a1a1a'],
+};
+// Carpeta de datos: ?data=data/sintetico la cambia sin tocar el código.
+const DATA_DIR = new URLSearchParams(location.search).get('data') || 'data/sintetico';
+const KEY = 'figura-temporal.v1';
+let S = Object.assign({}, DEFAULTS);
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+// ───────────────────────── utilidades ─────────────────────────
+const $ = s => document.querySelector(s);
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+const hex = h => { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; };
+const mixc = (a, b, t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const css = (c, a = 1) => `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+function ramp(t){ t = clamp(t, 0, 1); const a = hex(S.c0), b = hex(S.c1), c = hex(S.c2); return t < .5 ? mixc(a, b, t*2) : mixc(b, c, (t-.5)*2); }
+const status = (t, err) => { const el = $('#status'); el.textContent = t || ''; el.style.color = err ? 'var(--acc)' : ''; };
+function polyPath(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
+function linePath(ctx, pts){ ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); }
+const inBox = (p, v, m = 0) => Math.abs(p[0]-v.cx) <= v.w/2 + m && Math.abs(p[1]-v.cy) <= v.h/2 + m;
+
+// ───────────────────────── datos ─────────────────────────
+let DATA = null, T = null, X = null;  // todo el archivo, la trayectoria activa, derivados
+async function load(){
+  status('Cargando datos…');
+  try {
+    const r = await fetch(DATA_DIR + '/temporal.json'); if (!r.ok) throw new Error('HTTP ' + r.status);
+    DATA = await r.json();
+  } catch (e) { status(`No se pudo leer ${DATA_DIR}/temporal.json (${e.message}). Abre la página desde un servidor (run_dashboard.bat o GitHub Pages).`, true); return; }
+  pickTraj(false);
+}
+function pickTraj(resetMonths){
+  if (S.traj >= DATA.trajectories.length) S.traj = 0;
+  const t = DATA.trajectories[S.traj];
+  T = {
+    ...t,
+    nodes: t.nodes,
+    edges: t.edges.map(e => { const pts = [t.nodes[e[0]], ...(e[3]||[]), t.nodes[e[1]]]; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; pts.forEach(p => { x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]); x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]); }); return {u:e[0], v:e[1], cls:e[2], pts, bb:[x0,y0,x1,y1]}; }),
+  };
+  if (resetMonths || !S.months.length || S.months.some(m => !T.frames.find(f => f.month === m)) || S.months.length !== S.nPanels) defaultMonths();
+  if (resetMonths) centerOn();
+  status(`${DATA.meta.synthetic ? 'Datos sintéticos · ' : ''}${t.id}: ${t.k} meses con hotspot entre ${t.months[0]} y ${t.months[t.months.length-1]} · estabilidad ${t.stability} · ${t.buildings.length} edificios`);
+  buildControls(); derive(); invalidate(2);
+}
+// t1, t2, … el mes con hotspot, el hueco (si hay) como t_{n-1} y el último mes con hotspot como t_n.
+function defaultMonths(){
+  const fr = T.frames, mem = fr.filter(f => f.hot.length).map(f => f.month), n = S.nPanels;
+  const gaps = fr.filter(f => !f.hot.length && f.month > mem[0] && f.month < mem[mem.length-1]).map(f => f.month);
+  const last = mem[mem.length-1];
+  const prev = gaps.length ? gaps[gaps.length-1] : mem[mem.length-2] || last;
+  let pick = n === 2 ? [mem[0], last] : [...mem.slice(0, n-2), prev, last];
+  while (pick.length < n) pick.splice(pick.length-2, 0, fr[Math.min(pick.length, fr.length-1)].month);
+  S.months = pick.slice(0, n); save();
+}
+
+// Conteo de delitos por esquina: cada denuncia va a la intersección más cercana si está a menos de snapR.
+function derive(){
+  const N = T.nodes.length, r2 = S.snapR*S.snapR;
+  X = {byMonth:{}};
+  for (const f of T.frames){
+    const cnt = new Float64Array(N);
+    for (const c of f.crimes){
+      let b = -1, bd = r2; for (let i = 0; i < N; i++){ const p = T.nodes[i], q = (p[0]-c[0])**2 + (p[1]-c[1])**2; if (q < bd){ bd = q; b = i; } }
+      if (b >= 0) cnt[b]++;
+    }
+    const seen = new Map(), disp = f.crimes.map(c => { const k = c[0] + ',' + c[1], m = seen.get(k) || 0; seen.set(k, m + 1);
+      if (!m || !S.spread) return c; const a = m*2.39996, r = S.spread*Math.sqrt(m)*.6; return [c[0] + r*Math.cos(a), c[1] + r*Math.sin(a)]; });
+    X.byMonth[f.month] = {frame:f, cnt, disp, hot:new Set(f.hot)};
+  }
+}
+function stats(){
+  const v = mainView(), ms = S.months.map(m => X.byMonth[m]).filter(Boolean);
+  const fmaxOf = d => { let m = 0; d.hot.forEach(i => m = Math.max(m, d.frame.f[i])); return m; };
+  const cmaxOf = d => { let m = 0; d.cnt.forEach((c, i) => { if (inBox(T.nodes[i], v)) m = Math.max(m, c); }); return m; };
+  const jf = Math.max(1e-9, ...ms.map(fmaxOf)), jc = Math.max(1, ...ms.map(cmaxOf));
+  X.fmax = m => S.jointScale ? jf : Math.max(1e-9, fmaxOf(X.byMonth[m]));
+  X.cmax = m => S.cRef > 0 ? S.cRef : S.jointScale ? jc : Math.max(1, cmaxOf(X.byMonth[m]));
+}
+
+// ───────────────────────── dibujo de un mes (coordenadas en metros) ─────────────────────────
+const mainView = () => ({cx:S.viewX, cy:S.viewY, w:S.viewSize, h:S.viewSize});
+const zoomView = () => ({cx:S.viewX + S.zoomDX, cy:S.viewY + S.zoomDY, w:S.zoomSize, h:S.zoomSize*S.insetH/S.insetW});
+const STREET_W = {expressway:20, avenue:16, collector:11, street:7.5, service:4.5};
+const edgeVis = (e, v, m) => !(e.bb[2] < v.cx - v.w/2 - m || e.bb[0] > v.cx + v.w/2 + m || e.bb[3] < v.cy - v.h/2 - m || e.bb[1] > v.cy + v.h/2 + m);
+function cRadius(c, max, ins){
+  const t = S.cScale === 'linear' ? c/max : S.cScale === 'log' ? Math.log1p(c)/Math.log1p(max) : Math.sqrt(c/max);
+  const a = ins ? S.cMinI : S.cMin, b = ins ? S.cMaxI : S.cMax;
+  return a + (b - a)*clamp(t, 0, 1);
+}
+function drawMonth(ctx, month, v, u, ins, T2){
+  const d = X.byMonth[month]; if (!d) return;
+  const f = d.frame.f, fmax = X.fmax(month), sym = ins ? S.insetSym : 1;
+  // mapa base
+  const hasB = T.buildings.length > 0;
+  ctx.fillStyle = hasB ? S.land : S.noBldFill; ctx.fillRect(v.cx - v.w/2, v.cy - v.h/2, v.w, v.h);
+  const vis = p => p.some(q => inBox(q, v, 30));
+  ctx.fillStyle = S.water; T.water.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); } });
+  ctx.fillStyle = S.park; T.parks.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); } });
+  if (hasB){
+    ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.10)'; ctx.translate(1.2*u, 1.6*u); T.buildings.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); } }); ctx.restore();
+    ctx.fillStyle = S.building; ctx.strokeStyle = css(mixc(hex(S.building), [0,0,0], .18)); ctx.lineWidth = .5*u;
+    T.buildings.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); ctx.stroke(); } });
+  }
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const cls of ['service','street','collector','avenue','expressway']){
+    ctx.strokeStyle = cls === 'avenue' || cls === 'expressway' ? S.avenue : S.street;
+    ctx.lineWidth = Math.max((STREET_W[cls] || 7)*S.streetScale, 1.1*u);
+    T.edges.forEach(e => { if (e.cls === cls && edgeVis(e, v, 30)){ linePath(ctx, e.pts); ctx.stroke(); } });
+  }
+  // subgrafo Topocrime: halo (zona de influencia), aristas coloreadas por densidad
+  const sub = T.edges.filter(e => d.hot.has(e.u) && d.hot.has(e.v));
+  if (sub.length && S.haloM > 0){
+    const hc = document.createElement('canvas'); hc.width = T2[0]; hc.height = T2[1]; const h = hc.getContext('2d');
+    h.setTransform(ctx.getTransform()); h.lineCap = 'round'; h.lineJoin = 'round';
+    const hw = S.haloM, ol = 1.6*u, col = hex(S.haloColor);
+    if (S.haloOutline){ h.strokeStyle = css(mixc(col, [0,0,0], .15)); h.lineWidth = hw + 2*ol; sub.forEach(e => { linePath(h, e.pts); h.stroke(); }); }
+    h.strokeStyle = css(col); h.lineWidth = hw; sub.forEach(e => { linePath(h, e.pts); h.stroke(); });
+    // el halo crece hacia el núcleo: una segunda pasada más estrecha y más intensa
+    h.strokeStyle = css(mixc(col, hex(S.c2), .35)); h.lineWidth = hw*.45; sub.forEach(e => { linePath(h, e.pts); h.stroke(); });
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = S.haloAlpha; ctx.drawImage(hc, 0, 0); ctx.restore();
+  }
+  sub.map(e => [e, (f[e.u] + f[e.v])/2]).sort((a, b) => a[1] - b[1]).forEach(([e, val]) => {
+    const t = Math.pow(clamp(val/fmax, 0, 1), S.gamma);
+    ctx.strokeStyle = css(ramp(t)); ctx.lineWidth = (S.lineMin + (S.lineMax - S.lineMin)*t)*u*sym; linePath(ctx, e.pts); ctx.stroke();
+  });
+  if (S.showHotNodes) d.hot.forEach(i => { const p = T.nodes[i], t = Math.pow(clamp(f[i]/fmax, 0, 1), S.gamma); ctx.beginPath(); ctx.arc(p[0], p[1], (1.5 + 2.5*t)*u*sym, 0, 7); ctx.fillStyle = css(ramp(t)); ctx.fill(); });
+  // delitos individuales
+  const cc = hex(S.crimeColor);
+  if (S.ptMode !== 'corners'){
+    const r = (ins ? S.crimeRI : S.crimeR)*u;
+    const near = c => { for (const i of d.hot){ const p = T.nodes[i]; if ((p[0]-c[0])**2 + (p[1]-c[1])**2 < (S.haloM*1.5)**2) return true; } return false; };
+    ctx.lineWidth = .45*u; ctx.strokeStyle = css(mixc(cc, [0,0,0], .35), .9);
+    d.disp.forEach(c => { if (!inBox(c, v, r)) return; const a = near(c) ? 1 : S.outsideAlpha;
+      ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, 7); ctx.fillStyle = css(cc, S.crimeAlpha*a); ctx.fill(); ctx.stroke(); });
+  }
+  // aglomeraciones en esquinas
+  if (S.ptMode !== 'points'){
+    const cmax = X.cmax(month);
+    const ids = [...d.cnt.keys()].filter(i => d.cnt[i] >= S.cMinCount && inBox(T.nodes[i], v, 20)).sort((a, b) => d.cnt[a] - d.cnt[b]);
+    for (const i of ids){
+      const c = d.cnt[i], p = T.nodes[i], r = cRadius(c, cmax, ins)*u;
+      const col = S.cColorMode === 'ramp' ? ramp(Math.pow(clamp(c/cmax, 0, 1), S.gamma)) : cc;
+      ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7); ctx.fillStyle = css(col, .92); ctx.fill();
+      if (S.cStroke){ ctx.strokeStyle = css(mixc(col, [0,0,0], .45)); ctx.lineWidth = .8*u; ctx.stroke(); }
+      if (S.cLabels && ins && c >= S.cLabelMin){
+        ctx.fillStyle = '#fff'; ctx.font = `600 ${Math.max(7, r/u*0.95)*u}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(String(c), p[0], p[1] + .3*u);
+      }
+    }
+  }
+}
+function makeTex(month, v, dispW, dispH, scale, ins){
+  const Tw = Math.min(4096, Math.ceil(dispW*scale*1.3)), Th = Math.min(4096, Math.ceil(dispH*scale*1.3));
+  const c = document.createElement('canvas'); c.width = Tw; c.height = Th;
+  const ctx = c.getContext('2d'), k = Tw/v.w;
+  ctx.setTransform(k, 0, 0, Th/v.h, -(v.cx - v.w/2)*k, -(v.cy - v.h/2)*Th/v.h);
+  drawMonth(ctx, month, v, v.w/dispW, ins, [Tw, Th]);
+  return c;
+}
+
+// ───────────────────────── composición ─────────────────────────
+function labelOf(i, n){
+  if (S.labelMode === 'month') return {base:S.months[i], sub:''};
+  if (S.labelMode === 'seq' || n < 3) return {base:'t', sub:String(i+1)};
+  if (i >= n-2) return {base:'t', sub: i === n-1 ? 'n' : 'n−1'};
+  return {base:'t', sub:String(i+1)};
+}
+function drawT(ctx, x, y, lab){
+  const fs = S.fontSize;
+  if (!lab.sub){ ctx.font = `600 ${fs*.8}px ${S.font}`; ctx.textAlign = 'center'; ctx.fillText(lab.base, x, y); return; }
+  ctx.font = `italic 700 ${fs}px ${S.font}`; const wb = ctx.measureText(lab.base).width;
+  ctx.font = `italic 600 ${fs*.62}px ${S.font}`; const ws = ctx.measureText(lab.sub).width;
+  const x0 = x - (wb + ws + 1)/2;
+  ctx.textAlign = 'left'; ctx.font = `italic 700 ${fs}px ${S.font}`; ctx.fillText(lab.base, x0, y);
+  ctx.font = `italic 600 ${fs*.62}px ${S.font}`; ctx.fillText(lab.sub, x0 + wb + 1, y + fs*.28);
+}
+function geom(){
+  const n = S.months.length, th = S.rot*Math.PI/180, c = Math.cos(th), s = Math.sin(th), k = Math.abs(c) + Math.abs(s);
+  const ex = S.W/2*k, ey = S.tilt*S.W/2*k, m = 24, titleH = S.fontSize*(S.monthSub && S.labelMode !== 'month' ? 2.3 : 1.6);
+  const pw = Math.max(2*ex, S.inset ? S.insetW : 0);
+  const cxs = Array.from({length:n}, (_, i) => m + pw/2 + i*(pw + S.gap));
+  const cy = m + titleH + ey;
+  const insY = cy + ey + S.thick + S.insetGap;
+  const width = Math.ceil(m*2 + n*pw + (n-1)*S.gap);
+  const height = Math.ceil((S.inset ? insY + S.insetH : cy + ey + S.thick + S.shadow*14) + m);
+  const P = (cx, u, v) => { const dx = (u-.5)*S.W, dy = (v-.5)*S.W; return [cx + dx*c - dy*s, cy + (dx*s + dy*c)*S.tilt]; };
+  return {n, th, ex, ey, m, titleH, pw, cxs, cy, insY, width, height, P};
+}
+const quad = (G, cx) => [[0,0],[1,0],[1,1],[0,1]].map(([u, v]) => G.P(cx, u, v));
+function pathPts(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
+function rrect(ctx, x, y, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+
+let cache = {ver:-1, scale:0, main:{}, ins:{}}, ver = 0;
+function render(canvas, scale, fresh, transparent){
+  const G = geom();
+  canvas.width = Math.round(G.width*scale); canvas.height = Math.round(G.height*scale);
+  const ctx = canvas.getContext('2d'); ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (!transparent){ ctx.fillStyle = S.bg; ctx.fillRect(0, 0, G.width, G.height); }
+  if (!fresh && (cache.ver !== ver || cache.scale !== scale)) cache = {ver, scale, main:{}, ins:{}};
+  const store = fresh ? {main:{}, ins:{}} : cache;
+  const mv = mainView(), zv = zoomView(), fc = hex(S.frameColor);
+  const zq = cx => [[0,0],[1,0],[1,1],[0,1]].map(([a, b]) => G.P(cx, (zv.cx - zv.w/2 + a*zv.w - (mv.cx - mv.w/2))/mv.w, (zv.cy - zv.h/2 + b*zv.h - (mv.cy - mv.h/2))/mv.h));
+
+  S.months.forEach((month, i) => {
+    const cx = G.cxs[i], q = quad(G, cx);
+    if (!store.main[month]) store.main[month] = makeTex(month, mv, S.W, S.W, scale, false);
+    if (S.inset && !store.ins[month]) store.ins[month] = makeTex(month, zv, S.insetW, S.insetH, scale, true);
+    // título
+    ctx.fillStyle = S.labelColor; ctx.textBaseline = 'alphabetic';
+    drawT(ctx, cx, G.m + S.fontSize, labelOf(i, G.n));
+    if (S.monthSub && S.labelMode !== 'month'){ ctx.fillStyle = S.subColor; ctx.font = `${S.fontSize*.52}px ${S.font}`; ctx.textAlign = 'center'; ctx.fillText(month, cx, G.m + S.fontSize*1.85); }
+    // sombra y canto
+    if (S.shadow > 0){ ctx.save(); ctx.shadowColor = `rgba(0,0,0,${.3*S.shadow})`; ctx.shadowBlur = 16*S.shadow*scale; ctx.shadowOffsetY = (S.thick + 5)*S.shadow*scale;
+      pathPts(ctx, q.map(p => [p[0], p[1] + S.thick])); ctx.fillStyle = S.slabColor; ctx.fill(); ctx.restore(); }
+    if (S.thick > 0){
+      const sc = hex(S.slabColor);
+      for (let k = 0; k < 4; k++){ const a = q[k], b = q[(k+1)%4]; pathPts(ctx, [a, b, [b[0], b[1]+S.thick], [a[0], a[1]+S.thick]]);
+        ctx.fillStyle = css(mixc(sc, [0,0,0], b[0] > a[0] ? .08 : .2)); ctx.fill(); ctx.strokeStyle = css(fc, .6); ctx.lineWidth = .6; ctx.stroke(); }
+    }
+    ctx.save(); pathPts(ctx, q); ctx.clip(); ctx.translate(cx, G.cy); ctx.scale(1, S.tilt); ctx.rotate(G.th);
+    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(store.main[month], -S.W/2, -S.W/2, S.W, S.W); ctx.restore();
+    ctx.strokeStyle = css(fc); ctx.lineWidth = 1; pathPts(ctx, q); ctx.stroke();
+    // recuadro
+    if (S.inset){
+      const z = zq(cx), x = cx - S.insetW/2, y = G.insY;
+      if (S.zoomFrame){ ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = css(fc, .85); ctx.lineWidth = .9; pathPts(ctx, z); ctx.stroke(); ctx.restore(); }
+      const L = z.reduce((a, b) => b[0] < a[0] ? b : a), R = z.reduce((a, b) => b[0] > a[0] ? b : a);
+      ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = css(fc, .75); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(L[0], L[1]); ctx.lineTo(x, y); ctx.moveTo(R[0], R[1]); ctx.lineTo(x + S.insetW, y); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.shadowColor = `rgba(0,0,0,${.22*S.shadow})`; ctx.shadowBlur = 10*scale; ctx.shadowOffsetY = 3*scale;
+      rrect(ctx, x, y, S.insetW, S.insetH, S.insetRadius); ctx.fillStyle = S.land; ctx.fill(); ctx.restore();
+      ctx.save(); rrect(ctx, x, y, S.insetW, S.insetH, S.insetRadius); ctx.clip(); ctx.drawImage(store.ins[month], x, y, S.insetW, S.insetH); ctx.restore();
+      rrect(ctx, x, y, S.insetW, S.insetH, S.insetRadius); ctx.strokeStyle = css(mixc(fc, [0,0,0], .2)); ctx.lineWidth = 2; ctx.stroke();
+    }
+    // flecha hacia el siguiente mes
+    if (i < G.n - 1){
+      const ax = cx + G.pw/2 + S.gap/2, ay = G.cy + S.arrowDY, L2 = S.arrowLen/2, hd = 7 + S.arrowW*1.5;
+      ctx.strokeStyle = S.arrowColor; ctx.lineWidth = S.arrowW; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(ax - L2, ay); ctx.lineTo(ax + L2, ay); ctx.moveTo(ax + L2 - hd, ay - hd*.75); ctx.lineTo(ax + L2, ay); ctx.lineTo(ax + L2 - hd, ay + hd*.75); ctx.stroke();
+      if (S.ellipsis && S.labelMode === 'tn' && i === G.n - 3){ ctx.fillStyle = S.arrowColor; ctx.font = `${S.fontSize}px ${S.font}`; ctx.textAlign = 'center'; ctx.fillText('···', ax, ay - 10); }
+    }
+  });
+  return G;
+}
+
+// ───────────────────────── ciclo de render ─────────────────────────
+let pending = 0, level = 0;
+function invalidate(l){ level = Math.max(level, l); if (!pending) pending = requestAnimationFrame(flush); }
+function flush(){
+  pending = 0; if (!T) return;
+  const l = level; level = 0;
+  if (l >= 3) derive();
+  if (l >= 2){ stats(); ver++; }
+  const cv = $('#fig'), G = render(cv, window.devicePixelRatio || 1, false, false);
+  cv.style.width = G.width + 'px';
+  $('#dims').textContent = `${G.width} × ${G.height} px · exporta ${G.width*+S.exportScale} × ${G.height*+S.exportScale}`;
+}
+
+// ───────────────────────── controles ─────────────────────────
+const FONTS = [['Georgia','Georgia'],['"Times New Roman", Times, serif','Times New Roman'],['"Cambria Math", Cambria, serif','Cambria'],['Arial, Helvetica, sans-serif','Arial / Helvetica'],['"Segoe UI", system-ui, sans-serif','Segoe UI']];
+function schema(){
+  const trajs = DATA ? DATA.trajectories.map((t, i) => [i, `${t.id} · ${t.months[0]}→${t.months[t.months.length-1]} · ${t.k} meses`]) : [];
+  const monthOpts = T ? T.frames.map(f => [f.month, `${f.month} · ${f.crimes.length} delitos${f.hot.length ? ` · hotspot ${f.hot.length} nodos` : ' · sin hotspot'}`]) : [];
+  const monthRows = S.months.map((m, i) => ['month:' + i, `Panel ${i+1}`, 'select', monthOpts, 2]);
+  return [
+    ['Hotspot y meses', true, [
+      ['traj','Trayectoria','select',trajs,9],
+      ['nPanels','Número de paneles','range',{min:2,max:6,step:1},8],
+      ...monthRows,
+      ['!auto','Elegir meses automáticamente','button'],
+      ['labelMode','Títulos','select',[['tn','t₁, t₂, …, tₙ₋₁, tₙ'],['seq','t₁, t₂, t₃, …'],['month','Mes (AAAA-MM)']],1],
+      ['monthSub','Mes bajo el título','check',0,1],
+      ['ellipsis','«···» antes de tₙ₋₁','check',0,1],
+      ['jointScale','Misma escala de color en todos los meses','check',0,2],
+    ]],
+    ['Ubicación', true, [
+      ['viewSize','Ventana del mapa (m)','range',{min:200,max:1500,step:10},2],
+      ['viewX','Centro X (m, este)','range',{min:-600,max:600,step:5},2],
+      ['viewY','Centro Y (m, sur)','range',{min:-600,max:600,step:5},2],
+      ['zoomSize','Ancho del área ampliada (m)','range',{min:60,max:900,step:5},2],
+      ['zoomDX','Zoom: desplazamiento X (m)','range',{min:-500,max:500,step:5},2],
+      ['zoomDY','Zoom: desplazamiento Y (m)','range',{min:-500,max:500,step:5},2],
+      ['!center','Centrar en el hotspot','button'],
+    ]],
+    ['Aglomeración en esquinas', true, [
+      ['ptMode','Qué dibujar','select',[['both','Delitos + círculos por esquina'],['corners','Solo círculos por esquina'],['points','Solo delitos individuales']],2],
+      ['snapR','Radio de captura de la esquina (m)','range',{min:5,max:150,step:1},3],
+      ['cMinCount','Mínimo de delitos para dibujar','range',{min:1,max:20,step:1},2],
+      ['cScale','Escala del radio','select',[['sqrt','√ conteo (área ∝ conteo)'],['linear','Lineal'],['log','Logarítmica']],2],
+      ['cRef','Conteo para el radio máximo (0 = auto)','range',{min:0,max:150,step:1},2],
+      ['cMin','Radio mínimo · mapa (px)','range',{min:.5,max:12,step:.1},2],
+      ['cMax','Radio máximo · mapa (px)','range',{min:2,max:30,step:.5},2],
+      ['cMinI','Radio mínimo · zoom (px)','range',{min:.5,max:20,step:.1},2],
+      ['cMaxI','Radio máximo · zoom (px)','range',{min:2,max:45,step:.5},2],
+      ['cColorMode','Color de los círculos','select',[['ramp','Gradiente por conteo'],['solid','Color de los delitos']],2],
+      ['cStroke','Contorno','check',0,2],
+      ['cLabels','Número dentro (solo zoom)','check',0,2],
+      ['cLabelMin','Mostrar número desde','range',{min:1,max:50,step:1},2],
+    ]],
+    ['Delitos y subgrafo', false, [
+      ['crimeColor','Color de los delitos','color',0,2],
+      ['crimeR','Radio · mapa (px)','range',{min:.5,max:6,step:.1},2],
+      ['crimeRI','Radio · zoom (px)','range',{min:.5,max:10,step:.1},2],
+      ['crimeAlpha','Opacidad','range',{min:.2,max:1,step:.01},2],
+      ['outsideAlpha','Opacidad fuera del hotspot','range',{min:0,max:1,step:.01},2],
+      ['spread','Dispersar repetidos (m)','range',{min:0,max:25,step:.5},3],
+      ['haloM','Ancho del halo (m)','range',{min:0,max:90,step:1},2],
+      ['haloColor','Color del halo','color',0,2],
+      ['haloAlpha','Opacidad del halo','range',{min:0,max:1,step:.01},2],
+      ['haloOutline','Contorno del halo','check',0,2],
+      ['lineMin','Arista: grosor mínimo (px)','range',{min:.3,max:8,step:.1},2],
+      ['lineMax','Arista: grosor máximo (px)','range',{min:1,max:16,step:.25},2],
+      ['showHotNodes','Nodos del subgrafo','check',0,2],
+      ['insetSym','Escala de líneas en el zoom','range',{min:.5,max:3,step:.05},2],
+    ]],
+    ['Paneles y flechas', false, [
+      ['W','Tamaño del mapa (px)','range',{min:150,max:600,step:5},2],
+      ['rot','Rotación (°)','range',{min:-60,max:60,step:1},1],
+      ['tilt','Inclinación (alto/ancho)','range',{min:.2,max:1,step:.01},1],
+      ['gap','Separación entre paneles (px)','range',{min:10,max:250,step:2},1],
+      ['thick','Grosor de la lámina (px)','range',{min:0,max:20,step:.5},1],
+      ['slabColor','Color del canto','color',0,1],
+      ['shadow','Sombra','range',{min:0,max:1,step:.05},1],
+      ['frameColor','Color de bordes','color',0,1],
+      ['arrowLen','Flecha: largo (px)','range',{min:10,max:120,step:1},1],
+      ['arrowW','Flecha: grosor (px)','range',{min:.5,max:6,step:.1},1],
+      ['arrowDY','Flecha: altura (px)','range',{min:-150,max:250,step:1},1],
+      ['arrowColor','Flecha: color','color',0,1],
+    ]],
+    ['Recuadros de zoom', false, [
+      ['inset','Mostrar recuadros','check',0,2],
+      ['insetW','Ancho (px)','range',{min:80,max:500,step:2},2],
+      ['insetH','Alto (px)','range',{min:60,max:500,step:2},2],
+      ['insetGap','Distancia bajo el mapa (px)','range',{min:0,max:200,step:1},1],
+      ['insetRadius','Esquinas redondeadas (px)','range',{min:0,max:20,step:.5},1],
+      ['zoomFrame','Marcar el área en el mapa','check',0,1],
+    ]],
+    ['Colores', false, [
+      ['preset','Gradiente','select',[['naranja','Naranja → rojo (como la imagen)'],['rojos','Rojos'],['magma','Magma'],['viridis','Viridis'],['azules','Azules'],['grises','Grises (B/N)'],['custom','Personalizado']],2],
+      ['c0','Gradiente: bajo','color',0,2],['c1','Gradiente: medio','color',0,2],['c2','Gradiente: alto','color',0,2],
+      ['gamma','Contraste (gamma)','range',{min:.3,max:1.5,step:.05},2],
+      ['land','Fondo de manzana','color',0,2],['building','Edificios','color',0,2],['noBldFill','Manzana sin edificios OSM','color',0,2],
+      ['street','Calles','color',0,2],['avenue','Avenidas','color',0,2],['park','Parques','color',0,2],['water','Agua','color',0,2],
+      ['streetScale','Ancho de calles','range',{min:.3,max:2.5,step:.05},2],
+      ['bg','Fondo de la figura','color',0,1],
+    ]],
+    ['Texto', false, [
+      ['font','Tipografía','select',FONTS,1],
+      ['fontSize','Tamaño de los títulos','range',{min:10,max:44,step:.5},1],
+      ['labelColor','Color de los títulos','color',0,1],
+      ['subColor','Color del mes','color',0,1],
+    ]],
+    ['Exportar', true, [
+      ['exportScale','Escala de exportación','select',[['2','2×'],['3','3×'],['4','4×'],['6','6×']],1],
+      ['transparent','Fondo transparente','check',0,0],
+      ['!png','Descargar PNG','button','pri'],
+      ['!json','Guardar configuración (.json)','button'],
+      ['!load','Cargar configuración…','button'],
+      ['!reset','Restablecer valores','button'],
+    ]],
+  ];
+}
+const rows = [];
+function buildControls(){
+  const root = $('#controls'), openState = {}; root.querySelectorAll('details').forEach(d => openState[d.dataset.k] = d.open);
+  root.innerHTML = ''; rows.length = 0;
+  for (const [title, open, items] of schema()){
+    const det = document.createElement('details'); det.dataset.k = title; det.open = title in openState ? openState[title] : open;
+    det.innerHTML = `<summary>${title}</summary>`; root.appendChild(det);
+    if (title === 'Aglomeración en esquinas'){ const inf = document.createElement('div'); inf.className = 'info'; inf.textContent = 'Cada denuncia se asigna a la intersección más cercana dentro del radio de captura; el círculo crece con el número de denuncias. El mapa y el zoom tienen radios propios.'; det.appendChild(inf); }
+    for (const [key, label, type, opt, lvl = 2] of items){
+      if (key[0] === '!'){ const b = document.createElement('button'); b.textContent = label; if (opt === 'pri') b.className = 'pri'; b.onclick = () => ACTIONS[key.slice(1)](); det.appendChild(b); continue; }
+      const row = document.createElement('div'); row.className = 'row' + (type === 'range' ? '' : ' wide');
+      const lab = document.createElement('label'); lab.textContent = label; row.appendChild(lab);
+      const isMonth = key.startsWith('month:'), mi = isMonth ? +key.slice(6) : -1, get = () => isMonth ? S.months[mi] : S[key];
+      let inp;
+      if (type === 'select'){ inp = document.createElement('select'); opt.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; inp.appendChild(o); }); inp.value = String(get()); }
+      else { inp = document.createElement('input'); inp.type = type === 'check' ? 'checkbox' : type; if (opt && typeof opt === 'object') Object.assign(inp, opt);
+        if (type === 'check') inp.checked = !!get(); else inp.value = get(); }
+      row.appendChild(inp);
+      const val = document.createElement('span'); val.className = 'val'; if (type === 'range'){ val.textContent = get(); row.appendChild(val); }
+      inp.addEventListener(type === 'range' ? 'input' : 'change', () => {
+        let v = type === 'check' ? inp.checked : type === 'range' ? +inp.value : inp.value;
+        if (isMonth){ S.months[mi] = v; save(); invalidate(2); return; }
+        if (key === 'traj') v = +v;
+        S[key] = v; val.textContent = v;
+        if (key === 'preset' && PRESETS[v]){ [S.c0, S.c1, S.c2] = PRESETS[v]; syncInputs(); }
+        if (['c0','c1','c2'].includes(key)){ S.preset = 'custom'; syncInputs(); }
+        save();
+        if (lvl === 9){ S.viewX = S.viewY = S.zoomDX = S.zoomDY = 0; pickTraj(true); return; }
+        if (lvl === 8){ defaultMonths(); buildControls(); invalidate(2); return; }
+        invalidate(lvl);
+      });
+      det.appendChild(row); rows.push({key, inp, val, type});
+    }
+  }
+}
+function syncInputs(){ rows.forEach(r => { if (r.key.startsWith('month:')) return; if (r.type === 'check') r.inp.checked = !!S[r.key]; else r.inp.value = S[r.key]; if (r.val) r.val.textContent = S[r.key]; }); }
+// Ventana en el centroide del hotspot en los meses elegidos; el zoom, en su nodo más denso.
+function centerOn(){
+  let x = 0, y = 0, n = 0, best = -1, bf = -1;
+  S.months.forEach(m => { const fr = T.frames.find(f => f.month === m); if (!fr) return;
+    fr.hot.forEach(i => { x += T.nodes[i][0]; y += T.nodes[i][1]; n++; if (fr.f[i] > bf){ bf = fr.f[i]; best = i; } }); });
+  if (!n) return;
+  S.viewX = Math.round(x/n); S.viewY = Math.round(y/n);
+  S.zoomDX = Math.round(T.nodes[best][0] - S.viewX); S.zoomDY = Math.round(T.nodes[best][1] - S.viewY); save();
+}
+const ACTIONS = {
+  auto(){ defaultMonths(); buildControls(); invalidate(2); },
+  center(){ centerOn(); syncInputs(); invalidate(2); },
+  png(){
+    const cv = document.createElement('canvas'), sc = +S.exportScale; render(cv, sc, true, S.transparent);
+    cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `figura_temporal_${T.id}_${sc}x.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+  },
+  json(){ const b = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'figura_temporal_config.json'; a.click(); },
+  load(){ const i = document.createElement('input'); i.type = 'file'; i.accept = '.json'; i.onchange = async () => { try { Object.assign(S, JSON.parse(await i.files[0].text())); save(); pickTraj(false); invalidate(3); } catch (e) { status('Configuración inválida', true); } }; i.click(); },
+  reset(){ S = Object.assign({}, DEFAULTS, {months:[]}); save(); pickTraj(true); invalidate(3); },
+};
+let FIRST = true; try { FIRST = !localStorage.getItem(KEY); } catch (e) {}
+load().then(() => { if (FIRST && T){ centerOn(); buildControls(); invalidate(2); } });
+</script>
+</body>
+</html>

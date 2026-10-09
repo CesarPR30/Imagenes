@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figura de capas</title>
+<style>
+:root{--bg:#f3f4f6;--panel:#ffffff;--ink:#1f2328;--muted:#667085;--line:#e3e6ea;--acc:#b4161d;--stage:#d9dce1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171a;--panel:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c;--stage:#0e0f11}}
+:root[data-theme="dark"]{--bg:#15171a;--panel:#1d2024;--ink:#e8eaed;--muted:#9aa1ab;--line:#2d3137;--acc:#f0565c;--stage:#0e0f11}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{display:flex;height:100vh}
+#side{width:370px;min-width:370px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;padding:12px 14px 40px}
+#side h1{font-size:16px;margin:2px 0 2px}
+#side .sub{color:var(--muted);font-size:12px;margin-bottom:10px}
+details{border-top:1px solid var(--line);padding:6px 0}
+summary{cursor:pointer;font-weight:600;padding:4px 0;list-style:none}
+summary::before{content:"▸ ";color:var(--muted)}
+details[open]>summary::before{content:"▾ "}
+.row{display:grid;grid-template-columns:150px 1fr 44px;gap:6px;align-items:center;margin:4px 0}
+.row label{color:var(--muted);font-size:12px}
+.row input[type=range]{width:100%}
+.row input[type=number],.row input[type=text],.row select{width:100%;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);font:inherit}
+.row .val{font-variant-numeric:tabular-nums;font-size:11px;color:var(--muted);text-align:right}
+.row.wide{grid-template-columns:150px 1fr}
+.head{margin:12px 0 4px;font-weight:600;font-size:12px;color:var(--acc);display:flex;gap:6px;align-items:center}
+.head input[type=text]{flex:1;padding:3px 5px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--ink);font:inherit;font-weight:400}
+button{font:inherit;padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer;width:100%;margin:3px 0}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+#mini{width:100%;aspect-ratio:1;border:1px solid var(--line);border-radius:6px;background:#fafafa;cursor:crosshair;touch-action:none}
+.hint{font-size:11px;color:var(--muted);margin:2px 0 6px}
+#status{font-size:12px;margin:6px 0;color:var(--muted);min-height:16px}
+#stage{flex:1;overflow:auto;background:var(--stage);display:flex;align-items:flex-start;justify-content:center;padding:18px}
+#fig{background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.18);max-width:100%;height:auto}
+#dims{position:fixed;right:14px;bottom:10px;font-size:11px;color:var(--muted);background:var(--panel);padding:3px 8px;border-radius:5px;border:1px solid var(--line)}
+@media (max-width:800px){#app{flex-direction:column;height:auto}#side{width:100%;min-width:0;border-right:0}#stage{padding:16px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1>Figura de capas — de eventos a subgrafo</h1>
+    <div class="sub">Siete representaciones espaciales del mismo conjunto de delitos, apiladas como láminas.</div>
+    <canvas id="mini" width="600" height="600"></canvas>
+    <div class="hint">Clic o arrastre: mueve la ventana · Shift + clic: mueve el área de zoom · Rueda: acerca/aleja</div>
+    <div id="status"></div>
+    <div id="controls"></div>
+  </aside>
+  <main id="stage"><canvas id="fig"></canvas></main>
+</div>
+<div id="dims"></div>
+<script>
+"use strict";
+// ───────────────────────── estado ─────────────────────────
+const LAYERS = [
+  {id:'raw',    en:'Crime events (raw)',      es:'Eventos delictivos (crudos)'},
+  {id:'kde',    en:'Kernel density (KDE)',    es:'Densidad kernel (KDE)'},
+  {id:'census', en:'Census blocks',           es:'Manzanas censales'},
+  {id:'grid',   en:'Regular grid',            es:'Grilla regular'},
+  {id:'inter',  en:'Street intersections',    es:'Intersecciones viales'},
+  {id:'seg',    en:'Street segments',         es:'Segmentos viales'},
+  {id:'topo',   en:'Topo-crime subgraph',     es:'Subgrafo topo-crimen'},
+];
+const PRESETS = {
+  rojos:   ['#fde0c5','#f26b3a','#9e0b0f'],
+  magma:   ['#fcf1b4','#f1605d','#3b0f70'],
+  inferno: ['#fbe38c','#e8583a','#5c126e'],
+  viridis: ['#fde725','#21918c','#440154'],
+  azules:  ['#d6e6f4','#4a98c9','#08306b'],
+  grises:  ['#e3e3e3','#8c8c8c','#1a1a1a'],
+};
+const DEFAULTS = {
+  source:'lima', hotspot:0, realHot:true,
+  osmLat:-12.0464, osmLon:-77.0428, osmRadius:700,
+  nCrimes:300, lambda:75, seed:7,
+  viewX:0, viewY:0, viewSize:760,
+  W:430, rot:20, tilt:0.46, sep:170, thick:5, opacity:0.97, order:'physical', shadow:0.6, guides:true, frameColor:'#5b6573',
+  inset:true, insetSize:150, insetGap:70, zoomSize:230, zoomDX:0, zoomDY:0, zoomFrame:true, insetSym:1.7,
+  preset:'rojos', c0:'#fde0c5', c1:'#f26b3a', c2:'#9e0b0f', gamma:0.75, sat:0.5,
+  crimeColor:'#c0141c', crimeR:2.2, crimeAlpha:0.85, spread:7,
+  land:'#e4e4e1', building:'#d1d1ce', street:'#ffffff', avenue:'#f7dcae', park:'#c4dcae', water:'#bcd6ec', streetScale:1, baseFade:0.12,
+  kdeBw:55, kdeAlpha:0.88, kdeCut:0.05, kdeDots:true,
+  censusN:4, censusMode:'choro', censusAlpha:0.62, censusDots:true,
+  gridN:14, gridAlpha:0.85, gridDots:false,
+  interMin:1.6, interMax:10, interEmpty:true,
+  snapR:0, cScale:'sqrt', cRef:0, cMinCount:1, cMinI:3, cMaxI:16, cIndep:false, cLabels:false, cLabelMin:3,
+  segMin:1.2, segMax:6.5, segNorm:'count',
+  subQ:0.35, haloW:20, haloAlpha:0.45, topoContext:true,
+  labels:'left', labelW:150, lang:'en', prefix:true, font:'Georgia', fontSize:14, labelColor:'#222222', legend:true,
+  bg:'#ffffff', transparent:false, exportScale:'4',
+};
+LAYERS.forEach(L => { DEFAULTS['on_'+L.id] = true; DEFAULTS['lbl_'+L.id] = ''; });
+
+// Carpeta de datos: ?data=data/sintetico la cambia sin tocar el código.
+const DATA_DIR = new URLSearchParams(location.search).get('data') || 'data/sintetico';
+const KEY = 'figura-capas.v1';
+let S = Object.assign({}, DEFAULTS);
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+// ───────────────────────── utilidades ─────────────────────────
+const $ = s => document.querySelector(s);
+const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
+function rng(seed){ let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function gauss(r){ let u = 0; while (!u) u = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); }
+const hex = h => { h = h.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; };
+const mixc = (a, b, t) => [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t, a[2]+(b[2]-a[2])*t];
+const css = (c, a = 1) => `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+function ramp(t){ t = clamp(t, 0, 1); const a = hex(S.c0), b = hex(S.c1), c = hex(S.c2); return t < .5 ? mixc(a, b, t * 2) : mixc(b, c, (t - .5) * 2); }
+const tn = (v, max) => max > 0 ? Math.pow(clamp(v / max, 0, 1), S.gamma) : 0;
+function segD2(px, py, ax, ay, bx, by){ const dx = bx-ax, dy = by-ay, L = dx*dx+dy*dy; let t = L ? ((px-ax)*dx+(py-ay)*dy)/L : 0; t = clamp(t,0,1); const x = ax+t*dx-px, y = ay+t*dy-py; return x*x+y*y; }
+const plen = pts => { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); return s; };
+function pointAt(pts, d){ for (let i = 1; i < pts.length; i++){ const l = Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); if (d <= l || i === pts.length-1){ const t = l ? clamp(d/l,0,1) : 0; return [pts[i-1][0]+t*(pts[i][0]-pts[i-1][0]), pts[i-1][1]+t*(pts[i][1]-pts[i-1][1]), (pts[i][0]-pts[i-1][0])/(l||1), (pts[i][1]-pts[i-1][1])/(l||1)]; } d -= l; } return [...pts[0],1,0]; }
+const status = (t, err) => { const el = $('#status'); el.textContent = t || ''; el.style.color = err ? 'var(--acc)' : ''; };
+
+// ───────────────────────── datos ─────────────────────────
+// Modelo común (metros, x al este, y al sur):
+// D = {nodes:[[x,y]], edges:[{u,v,cls,pts}], crimes:[[x,y]], buildings, parks, water, f, hotspots:[{name,nodes}]}
+let D = null, LIMA = null;
+
+function edgesFinish(d){
+  d.edges.forEach(e => { e.len = plen(e.pts); let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; e.pts.forEach(p => { x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]); x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]); }); e.bb=[x0,y0,x1,y1]; });
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; d.nodes.forEach(p => { x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]); x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]); });
+  d.extent = [x0,y0,x1,y1];
+  d.buildings = d.buildings || []; d.parks = d.parks || []; d.water = d.water || [];
+  return d;
+}
+
+async function loadLima(){
+  if (!LIMA){
+    const r = await fetch(DATA_DIR + '/explainer.json');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    LIMA = await r.json();
+  }
+  const c = LIMA.clip, N = c.nodes;
+  const d = {
+    nodes: N.map(p => [p[0], p[1]]),
+    edges: c.edges.map(e => ({u:e[0], v:e[1], cls:e[2], pts:[N[e[0]], ...(e[3]||[]), N[e[1]]]})),
+    crimes: c.crimes.map(p => [p[0], p[1]]),
+    f: c.f.slice(),
+    hotspots: c.hotspots.map(h => ({name:h.id, nodes:h.nodes})),
+    buildings: c.buildings, parks: c.parks, water: c.water,
+    origin: LIMA.meta.center,  // [lon, lat]; null en los datos sintéticos
+    label: `${LIMA.meta.synthetic ? 'Ciudad sintética (datos de ejemplo)' : 'Lima · ' + LIMA.meta.month} · ${c.crimes.length} delitos`,
+  };
+  return edgesFinish(d);
+}
+
+function synthNetwork(seed){
+  const r = rng(seed), sp = 78, n = 9, nodes = [], idx = {}, edges = [], buildings = [], parks = [];
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++){
+    idx[i+','+j] = nodes.length;
+    nodes.push([i*sp + gauss(r)*7 + j*6, j*sp + gauss(r)*7 - i*4]);
+  }
+  const cls = (i, a) => i === 0 ? 'avenue' : (Math.abs(i) % 4 === 2 ? 'collector' : 'street');
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++){
+    const a = idx[i+','+j];
+    if (i < n && (j === 0 || r() > .07)) edges.push({u:a, v:idx[(i+1)+','+j], cls:cls(j)});
+    if (j < n && (i === 0 || r() > .07)) edges.push({u:a, v:idx[i+','+(j+1)], cls:cls(i)});
+  }
+  edges.forEach(e => e.pts = [nodes[e.u], nodes[e.v]]);
+  // manzanas con edificios
+  for (let i = -n; i < n; i++) for (let j = -n; j < n; j++){
+    const q = [nodes[idx[i+','+j]], nodes[idx[(i+1)+','+j]], nodes[idx[(i+1)+','+(j+1)]], nodes[idx[i+','+(j+1)]]];
+    const ins = 0.16, cx = (q[0][0]+q[2][0])/2, cy = (q[0][1]+q[2][1])/2;
+    const sh = q.map(p => [p[0]+(cx-p[0])*ins, p[1]+(cy-p[1])*ins]);
+    if (r() < .06){ parks.push(sh); continue; }
+    const k = 2 + (r() < .5 ? 1 : 0);
+    for (let a = 0; a < k; a++) for (let b = 0; b < k; b++){
+      const L = (u, v) => { const x0 = sh[0][0]+(sh[1][0]-sh[0][0])*u, y0 = sh[0][1]+(sh[1][1]-sh[0][1])*u, x1 = sh[3][0]+(sh[2][0]-sh[3][0])*u, y1 = sh[3][1]+(sh[2][1]-sh[3][1])*u; return [x0+(x1-x0)*v, y0+(y1-y0)*v]; };
+      const g = .05;
+      buildings.push([L(a/k+g, b/k+g), L((a+1)/k-g, b/k+g), L((a+1)/k-g, (b+1)/k-g), L(a/k+g, (b+1)/k-g)]);
+    }
+  }
+  return {nodes, edges, buildings, parks, water:[], label:'Red sintética'};
+}
+
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+async function overpass(q){
+  let last;
+  for (const url of OVERPASS){
+    try { const r = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(q)}); if (r.ok) return await r.json(); last = new Error('HTTP ' + r.status); }
+    catch (e) { last = e; }
+  }
+  throw last;
+}
+function proj(lon0, lat0){ const kx = Math.cos(lat0*Math.PI/180)*111320, ky = 110540; return (lon, lat) => [(lon-lon0)*kx, (lat0-lat)*ky]; }
+function bboxStr(lon0, lat0, R){ const dl = R/110540, dn = R/(Math.cos(lat0*Math.PI/180)*111320); return `${lat0-dl},${lon0-dn},${lat0+dl},${lon0+dn}`; }
+
+async function fetchOsm(lon0, lat0, R, roads){
+  const bb = bboxStr(lon0, lat0, R), P = proj(lon0, lat0);
+  const q = `[out:json][timeout:90];(${roads ? `way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|motorway_link|trunk_link|primary_link|secondary_link)$"](${bb});` : ''}way["building"](${bb});way["leisure"~"^(park|garden|pitch|playground)$"](${bb});way["landuse"~"^(grass|recreation_ground|village_green)$"](${bb});way["natural"="water"](${bb}););out geom;`;
+  const js = await overpass(q);
+  const out = {buildings:[], parks:[], water:[], ways:[]};
+  for (const w of js.elements){
+    if (w.type !== 'way' || !w.geometry) continue;
+    const pts = w.geometry.map(g => P(g.lon, g.lat)), t = w.tags || {};
+    if (t.highway) out.ways.push({ids:w.nodes, pts, hw:t.highway});
+    else if (t.building) out.buildings.push(pts);
+    else if (t.natural === 'water') out.water.push(pts);
+    else out.parks.push(pts);
+  }
+  return out;
+}
+function osmNetwork(ways){
+  const use = new Map();
+  ways.forEach(w => w.ids.forEach((id, k) => use.set(id, (use.get(id)||0) + (k === 0 || k === w.ids.length-1 ? 2 : 1))));
+  const nodes = [], nid = new Map(), edges = [];
+  const getN = (id, p) => { if (!nid.has(id)){ nid.set(id, nodes.length); nodes.push(p); } return nid.get(id); };
+  const cls = h => /^(motorway|trunk|primary|secondary)/.test(h) ? 'avenue' : h === 'tertiary' ? 'collector' : h === 'service' ? 'service' : 'street';
+  for (const w of ways){
+    let s = 0;
+    for (let k = 1; k < w.ids.length; k++){
+      if (k === w.ids.length-1 || use.get(w.ids[k]) > 1){
+        const a = getN(w.ids[s], w.pts[s]), b = getN(w.ids[k], w.pts[k]);
+        if (a !== b) edges.push({u:a, v:b, cls:cls(w.hw), pts:w.pts.slice(s, k+1)});
+        s = k;
+      }
+    }
+  }
+  return {nodes, edges};
+}
+
+// Delitos simulados sobre la red: decaimiento exponencial con la distancia de red al hotspot.
+function synthCrimes(d){
+  const r = rng(S.seed * 31 + 5), N = d.nodes.length, adj = adjacency(d);
+  const deg = adj.map(a => a.length);
+  const pick = (x, y) => { let best = -1, bd = 1e18; d.nodes.forEach((p, i) => { if (deg[i] < 3) return; const q = (p[0]-x)**2 + (p[1]-y)**2; if (q < bd){ bd = q; best = i; } }); return best < 0 ? 0 : best; };
+  const dij = src => { const dist = new Float64Array(N).fill(Infinity); dist[src] = 0; const done = new Uint8Array(N);
+    for (;;){ let u = -1, bu = Infinity; for (let i = 0; i < N; i++) if (!done[i] && dist[i] < bu){ bu = dist[i]; u = i; } if (u < 0) break; done[u] = 1;
+      for (const [v, ei] of adj[u]){ const nd = bu + d.edges[ei].len; if (nd < dist[v]) dist[v] = nd; } } return dist; };
+  const hs = [[pick(0,0), 1, S.lambda], [pick(240, -170), .18, S.lambda*.6], [pick(-280, 210), .12, S.lambda*.5]];
+  const dists = hs.map(h => dij(h[0]));
+  const w = d.edges.map(e => { let s = .012; hs.forEach((h, k) => { const dm = Math.min(dists[k][e.u], dists[k][e.v]); s += h[1]*Math.exp(-dm/h[2]); }); return e.len*s; });
+  const cum = []; w.reduce((a, b, i) => (cum[i] = a + b), 0);
+  const tot = cum[cum.length-1], crimes = [];
+  for (let k = 0; k < S.nCrimes; k++){
+    const x = r()*tot; let lo = 0, hi = cum.length-1; while (lo < hi){ const m = (lo+hi) >> 1; if (cum[m] < x) lo = m+1; else hi = m; }
+    const e = d.edges[lo], p = pointAt(e.pts, r()*e.len), j = gauss(r)*3;
+    crimes.push([p[0] - p[3]*j, p[1] + p[2]*j]);
+  }
+  d.hotspots = [{name:'simulado', nodes:[hs[0][0]]}];
+  return crimes;
+}
+
+function adjacency(d){ const a = d.nodes.map(() => []); d.edges.forEach((e, i) => { a[e.u].push([e.v, i]); a[e.v].push([e.u, i]); }); return a; }
+
+async function loadData(){
+  status('Cargando datos…');
+  try {
+    if (S.source === 'lima'){
+      D = await loadLima();
+      if (S.hotspot >= D.hotspots.length) S.hotspot = 0;
+    } else if (S.source === 'synth'){
+      D = edgesFinish(synthNetwork(S.seed));
+      D.crimes = synthCrimes(D);
+    } else {
+      if (!D || D.kind !== 'osm' || D.key !== `${S.osmLat},${S.osmLon},${S.osmRadius}`){
+        status('Descargando OpenStreetMap…');
+        const o = await fetchOsm(S.osmLon, S.osmLat, S.osmRadius, true);
+        const net = osmNetwork(o.ways);
+        if (!net.edges.length) throw new Error('sin calles en esa zona');
+        D = edgesFinish({...net, buildings:o.buildings, parks:o.parks, water:o.water, kind:'osm', key:`${S.osmLat},${S.osmLon},${S.osmRadius}`, origin:[S.osmLon, S.osmLat]});
+      }
+      D.crimes = synthCrimes(D);
+      D.label = `OSM (${S.osmLat.toFixed(4)}, ${S.osmLon.toFixed(4)})`;
+    }
+    status(D.label + ` · ${D.nodes.length} nodos · ${D.edges.length} aristas`);
+  } catch (e) {
+    status(`No se pudo cargar (${e.message}). Uso la red sintética. ` + (S.source === 'lima' ? 'Abre la página con run_dashboard.bat.' : ''), true);
+    S.source = 'synth'; D = edgesFinish(synthNetwork(S.seed)); D.crimes = synthCrimes(D);
+  }
+  buildControls();
+  derive();
+}
+
+// ───────────────────────── derivados ─────────────────────────
+let X = {};   // derivados de datos
+function derive(){
+  const {nodes, edges, crimes} = D;
+  const crimeEdge = new Int32Array(crimes.length), crimeNode = new Int32Array(crimes.length);
+  crimes.forEach((c, k) => {
+    let be = 0, bd = Infinity;
+    edges.forEach((e, i) => { if (c[0] < e.bb[0]-60 || c[0] > e.bb[2]+60 || c[1] < e.bb[1]-60 || c[1] > e.bb[3]+60) return;
+      for (let j = 1; j < e.pts.length; j++){ const q = segD2(c[0], c[1], e.pts[j-1][0], e.pts[j-1][1], e.pts[j][0], e.pts[j][1]); if (q < bd){ bd = q; be = i; } } });
+    crimeEdge[k] = be;
+    let bn = 0, bnd = Infinity; nodes.forEach((p, i) => { const q = (p[0]-c[0])**2 + (p[1]-c[1])**2; if (q < bnd){ bnd = q; bn = i; } });
+    crimeNode[k] = S.snapR > 0 && bnd > S.snapR*S.snapR ? -1 : bn;
+  });
+  const edgeCnt = new Float64Array(edges.length), nodeCnt = new Float64Array(nodes.length);
+  crimeEdge.forEach(e => edgeCnt[e]++); crimeNode.forEach(n => { if (n >= 0) nodeCnt[n]++; });
+  let f = D.f;
+  if (!f){
+    const h2 = 2 * S.kdeBw * S.kdeBw;
+    f = nodes.map(p => crimes.reduce((s, c) => s + Math.exp(-((p[0]-c[0])**2 + (p[1]-c[1])**2)/h2), 0));
+    const m = Math.max(...f) || 1; f = f.map(v => v/m);
+  }
+  // Puntos con la misma coordenada (geocodificación a una dirección) se abren en espiral, sólo al dibujar.
+  const seen = new Map(), disp = crimes.map(c => { const key = c[0] + ',' + c[1], m = seen.get(key) || 0; seen.set(key, m + 1);
+    if (!m || !S.spread) return c; const a = m * 2.39996, r = S.spread * Math.sqrt(m) * .6; return [c[0] + r*Math.cos(a), c[1] + r*Math.sin(a)]; });
+  X = {crimeEdge, crimeNode, edgeCnt, nodeCnt, f, adj:adjacency(D), disp};
+  computeHot();
+}
+function hotspotCenter(){
+  if (!D.hotspots || !D.hotspots[S.hotspot]) return [0, 0];
+  const ns = D.hotspots[S.hotspot].nodes; let x = 0, y = 0; ns.forEach(i => { x += D.nodes[i][0]; y += D.nodes[i][1]; });
+  return [x/ns.length, y/ns.length];
+}
+function computeHot(){
+  if (S.source === 'lima' && S.realHot && D.hotspots[S.hotspot]){ X.hot = new Set(D.hotspots[S.hotspot].nodes); return; }
+  const f = X.f, h = S.viewSize/2; let best = -1;
+  D.nodes.forEach((p, i) => { if (Math.abs(p[0]-S.viewX) < h && Math.abs(p[1]-S.viewY) < h && (best < 0 || f[i] > f[best])) best = i; });
+  const hot = new Set(); if (best < 0){ X.hot = hot; return; }
+  const thr = S.subQ * f[best], st = [best]; hot.add(best);
+  while (st.length){ const u = st.pop(); for (const [v] of X.adj[u]) if (!hot.has(v) && f[v] >= thr){ hot.add(v); st.push(v); } }
+  X.hot = hot;
+}
+
+// Estadísticas de la ventana principal (los recuadros de zoom usan la misma escala).
+let ST = {};
+const mainView = () => ({cx:S.viewX, cy:S.viewY, S:S.viewSize});
+const zoomView = () => ({cx:S.viewX + S.zoomDX, cy:S.viewY + S.zoomDY, S:S.zoomSize});
+const inView = (p, v, m = 0) => Math.abs(p[0]-v.cx) <= v.S/2 + m && Math.abs(p[1]-v.cy) <= v.S/2 + m;
+
+function kdeRaster(v, R){
+  const h = S.kdeBw, h2 = 2*h*h, cs = v.S/R, ox = v.cx - v.S/2, oy = v.cy - v.S/2, out = new Float32Array(R*R), rc = Math.ceil(3*h/cs);
+  for (const c of D.crimes){
+    if (!inView(c, v, 3*h)) continue;
+    const ci = Math.floor((c[0]-ox)/cs), cj = Math.floor((c[1]-oy)/cs);
+    for (let j = Math.max(0, cj-rc); j <= Math.min(R-1, cj+rc); j++){
+      const dy = oy + (j+.5)*cs - c[1];
+      for (let i = Math.max(0, ci-rc); i <= Math.min(R-1, ci+rc); i++){ const dx = ox + (i+.5)*cs - c[0]; out[j*R+i] += Math.exp(-(dx*dx+dy*dy)/h2); }
+    }
+  }
+  return out;
+}
+function clipHalf(poly, nx, ny, c){
+  const out = [];
+  for (let k = 0; k < poly.length; k++){
+    const a = poly[k], b = poly[(k+1) % poly.length], da = nx*a[0]+ny*a[1]-c, db = nx*b[0]+ny*b[1]-c;
+    if (da <= 0) out.push(a);
+    if ((da <= 0) !== (db <= 0)){ const t = da/(da-db); out.push([a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])]); }
+  }
+  return out;
+}
+function computeStats(){
+  const v = mainView(), R = 220;
+  const kr = kdeRaster(v, R); let km = 0; for (const x of kr) if (x > km) km = x;
+  // manzanas censales: Voronoi de semillas en grilla perturbada
+  const r = rng(S.seed * 7 + 11), n = S.censusN, dom = v.S * 1.3, x0 = v.cx - dom/2, y0 = v.cy - dom/2, st = dom/n, seeds = [];
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) seeds.push([x0 + (i+.5+(r()-.5)*.75)*st, y0 + (j+.5+(r()-.5)*.75)*st]);
+  const box = [[x0,y0],[x0+dom,y0],[x0+dom,y0+dom],[x0,y0+dom]];
+  const cells = seeds.map((s, i) => { let p = box; seeds.forEach((q, j) => { if (i === j || p.length < 3) return; const nx = q[0]-s[0], ny = q[1]-s[1]; p = clipHalf(p, nx, ny, nx*(s[0]+q[0])/2 + ny*(s[1]+q[1])/2); }); return p; });
+  const ccnt = new Float64Array(seeds.length);
+  D.crimes.forEach(c => { let b = 0, bd = Infinity; seeds.forEach((s, i) => { const q = (s[0]-c[0])**2 + (s[1]-c[1])**2; if (q < bd){ bd = q; b = i; } }); ccnt[b]++; });
+  const cat = seeds.map((_, i) => i % 6);
+  // grilla regular alineada a la ventana principal
+  const g = S.gridN, gs = v.S/g, gx0 = v.cx - v.S/2, gy0 = v.cy - v.S/2, gcnt = new Float64Array(g*g);
+  D.crimes.forEach(c => { const i = Math.floor((c[0]-gx0)/gs), j = Math.floor((c[1]-gy0)/gs); if (i >= 0 && j >= 0 && i < g && j < g) gcnt[j*g+i]++; });
+  let nm = 0; D.nodes.forEach((p, i) => { if (inView(p, v)) nm = Math.max(nm, X.nodeCnt[i]); });
+  if (S.cRef > 0) nm = S.cRef / S.sat;  // el conteo de referencia ya fija el radio máximo
+  const segVal = D.edges.map((e, i) => S.segNorm === 'density' ? X.edgeCnt[i] / Math.max(e.len, 25) : X.edgeCnt[i]);
+  let em = 0; D.edges.forEach((e, i) => { if (inView(e.pts[0], v) || inView(e.pts[e.pts.length-1], v)) em = Math.max(em, segVal[i]); });
+  let fm = 0; X.hot.forEach(i => fm = Math.max(fm, X.f[i])); D.nodes.forEach((p, i) => { if (inView(p, v)) fm = Math.max(fm, X.f[i]); });
+  const k = S.sat;
+  ST = {kdeMax:km*k, cells, ccnt, cmax:Math.max(...ccnt)*k, cmaxRaw:Math.max(...ccnt), cat, gs, gx0, gy0, gcnt, gmax:Math.max(...gcnt)*k, nodeMax:nm*k, segVal, segMax:em*k, fMax:(fm || 1)*k};
+}
+
+// ───────────────────────── dibujo de cada lámina (coordenadas en metros) ─────────────────────────
+function polyPath(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
+function linePath(ctx, pts){ ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); }
+const edgeVisible = (e, v, m) => !(e.bb[2] < v.cx - v.S/2 - m || e.bb[0] > v.cx + v.S/2 + m || e.bb[3] < v.cy - v.S/2 - m || e.bb[1] > v.cy + v.S/2 + m);
+const STREET_W = {avenue:17, collector:11, street:7.5, service:4.5};
+
+function drawBase(ctx, v, u){
+  ctx.fillStyle = S.land; ctx.fillRect(v.cx - v.S/2, v.cy - v.S/2, v.S, v.S);
+  const vis = p => p.some(q => inView(q, v, 20));
+  ctx.fillStyle = S.water; D.water.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); } });
+  ctx.fillStyle = S.park;  D.parks.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); } });
+  ctx.fillStyle = S.building; ctx.strokeStyle = css(mixc(hex(S.building), [0,0,0], .12)); ctx.lineWidth = .5*u;
+  D.buildings.forEach(p => { if (vis(p)){ polyPath(ctx, p); ctx.fill(); ctx.stroke(); } });
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const cls of ['service', 'street', 'collector', 'avenue']){
+    ctx.strokeStyle = cls === 'avenue' ? S.avenue : S.street;
+    ctx.lineWidth = Math.max(STREET_W[cls]*S.streetScale, 1.1*u);
+    D.edges.forEach(e => { if (e.cls === cls && edgeVisible(e, v, 30)){ linePath(ctx, e.pts); ctx.stroke(); } });
+  }
+  if (S.baseFade > 0){ ctx.fillStyle = `rgba(255,255,255,${S.baseFade})`; ctx.fillRect(v.cx - v.S/2, v.cy - v.S/2, v.S, v.S); }
+}
+function drawDots(ctx, v, u, alpha = 1){
+  const r = S.crimeR*u, col = hex(S.crimeColor);
+  ctx.fillStyle = css(col, S.crimeAlpha*alpha); ctx.strokeStyle = css(mixc(col, [0,0,0], .35), .9*alpha); ctx.lineWidth = .45*u;
+  X.disp.forEach(c => { if (inView(c, v, r)){ ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, 7); ctx.fill(); ctx.stroke(); } });
+}
+// Radio de un círculo de esquina. En el zoom, si «radios propios» está activo, se usan cMinI/cMaxI en px del recuadro.
+function nodeRadius(v, max, U){
+  const x = clamp(v / max, 0, 1), t = S.cScale === 'linear' ? x : S.cScale === 'log' ? Math.log1p(v)/Math.log1p(max) : Math.sqrt(x);
+  const ind = U.ins && S.cIndep, a = ind ? S.cMinI : S.interMin, b = ind ? S.cMaxI : S.interMax;
+  return (a + (b - a)*clamp(t, 0, 1)) * (ind ? U.raw : U.sym);
+}
+function countLabel(ctx, p, c, r, U){
+  if (!(S.cLabels && U.ins && c >= S.cLabelMin)) return;
+  ctx.fillStyle = '#fff'; ctx.font = `600 ${Math.max(6*U.raw, r*0.95)}px system-ui,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(c), p[0], p[1] + .3*U.raw);
+}
+function nodeDisc(ctx, p, r, t, u){
+  const col = ramp(t); ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, 7);
+  ctx.fillStyle = css(col); ctx.fill(); ctx.strokeStyle = css(mixc(col, [0,0,0], .4)); ctx.lineWidth = .7*u; ctx.stroke();
+}
+const DRAW = {
+  raw(ctx, v, u){ drawDots(ctx, v, u); },
+  kde(ctx, v, u){
+    const R = 220, kr = kdeRaster(v, R), cv = document.createElement('canvas'); cv.width = cv.height = R;
+    const cx = cv.getContext('2d'), im = cx.createImageData(R, R);
+    for (let k = 0; k < R*R; k++){
+      const t = ST.kdeMax ? clamp(kr[k]/ST.kdeMax, 0, 1) : 0; if (t <= S.kdeCut) continue;
+      const col = ramp(Math.pow(t, S.gamma)), a = Math.pow((t - S.kdeCut)/(1 - S.kdeCut), .6) * S.kdeAlpha;
+      im.data[k*4] = col[0]; im.data[k*4+1] = col[1]; im.data[k*4+2] = col[2]; im.data[k*4+3] = a*255;
+    }
+    cx.putImageData(im, 0, 0);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cv, v.cx - v.S/2, v.cy - v.S/2, v.S, v.S);
+    if (S.kdeDots) drawDots(ctx, v, u*.8, .8);
+  },
+  census(ctx, v, u){
+    const pal = ['#f6c7a8','#c9c3ec','#b9cdf2','#cfe5c0','#f3d3e6','#fbe3a9'];
+    ST.cells.forEach((p, i) => {
+      if (p.length < 3) return;
+      polyPath(ctx, p);
+      if (S.censusMode === 'cat'){ ctx.fillStyle = css(i === ST.ccnt.indexOf(ST.cmaxRaw) ? ramp(.55) : hex(pal[ST.cat[i]]), S.censusAlpha); }
+      else ctx.fillStyle = css(ramp(tn(ST.ccnt[i], ST.cmax)), S.censusAlpha * (ST.ccnt[i] ? 1 : .45));
+      ctx.fill();
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6*u; ctx.lineJoin = 'round';
+    ST.cells.forEach(p => { if (p.length > 2){ polyPath(ctx, p); ctx.stroke(); } });
+    if (S.censusDots) drawDots(ctx, v, u*.85, .85);
+  },
+  grid(ctx, v, u){
+    const g = S.gridN, gs = ST.gs;
+    for (let j = 0; j < g; j++) for (let i = 0; i < g; i++){
+      const c = ST.gcnt[j*g+i]; if (!c) continue;
+      ctx.fillStyle = css(ramp(tn(c, ST.gmax)), S.gridAlpha); ctx.fillRect(ST.gx0 + i*gs, ST.gy0 + j*gs, gs, gs);
+    }
+    ctx.strokeStyle = 'rgba(120,128,138,.55)'; ctx.lineWidth = .7*u; ctx.beginPath();
+    for (let k = 0; k <= g; k++){ ctx.moveTo(ST.gx0 + k*gs, ST.gy0); ctx.lineTo(ST.gx0 + k*gs, ST.gy0 + g*gs); ctx.moveTo(ST.gx0, ST.gy0 + k*gs); ctx.lineTo(ST.gx0 + g*gs, ST.gy0 + k*gs); }
+    ctx.stroke();
+    if (S.gridDots) drawDots(ctx, v, u*.8, .8);
+  },
+  inter(ctx, v, u, T, U){
+    const ids = D.nodes.map((_, i) => i).filter(i => inView(D.nodes[i], v, 20)).sort((a, b) => X.nodeCnt[a] - X.nodeCnt[b]);
+    for (const i of ids){
+      const c = X.nodeCnt[i], p = D.nodes[i];
+      if (c && c < S.cMinCount) continue;
+      if (!c){ if (S.interEmpty){ ctx.beginPath(); ctx.arc(p[0], p[1], S.interMin*.75*u, 0, 7); ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.fill(); ctx.strokeStyle = css(mixc(ramp(.35), [0,0,0], .2), .8); ctx.lineWidth = .7*u; ctx.stroke(); } continue; }
+      const t = tn(c, ST.nodeMax), r = nodeRadius(c, ST.nodeMax, U);
+      nodeDisc(ctx, p, r, t, u); countLabel(ctx, p, c, r, U);
+    }
+  },
+  seg(ctx, v, u){
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const ids = D.edges.map((_, i) => i).filter(i => ST.segVal[i] > 0 && edgeVisible(D.edges[i], v, 20)).sort((a, b) => ST.segVal[a] - ST.segVal[b]);
+    for (const i of ids){
+      const t = tn(ST.segVal[i], ST.segMax);
+      ctx.strokeStyle = css(ramp(t)); ctx.lineWidth = (S.segMin + (S.segMax - S.segMin)*t)*u;
+      linePath(ctx, D.edges[i].pts); ctx.stroke();
+    }
+  },
+  topo(ctx, v, u, T, U){
+    const hot = X.hot, f = X.f, sub = D.edges.filter(e => hot.has(e.u) && hot.has(e.v));
+    if (S.topoContext){
+      D.nodes.forEach((p, i) => { if (hot.has(i) || !inView(p, v, 10) || f[i]/ST.fMax < .12) return;
+        ctx.beginPath(); ctx.arc(p[0], p[1], (S.interMin + (S.interMax - S.interMin)*.35*f[i]/ST.fMax)*u, 0, 7);
+        ctx.fillStyle = css(ramp(f[i]/ST.fMax), .45); ctx.fill(); ctx.strokeStyle = css(mixc(ramp(.4), [0,0,0], .2), .5); ctx.lineWidth = .6*u; ctx.stroke(); });
+    }
+    if (S.haloW > 0 && sub.length){
+      const hc = document.createElement('canvas'); hc.width = hc.height = T; const h = hc.getContext('2d');
+      h.setTransform(ctx.getTransform()); h.lineCap = 'round'; h.lineJoin = 'round';
+      const hw = S.haloW*u, ol = 1.4*u;
+      h.strokeStyle = css(hex(S.c1)); h.lineWidth = hw + 2*ol; sub.forEach(e => { linePath(h, e.pts); h.stroke(); });
+      h.strokeStyle = css(mixc(hex(S.c1), [255,255,255], .5)); h.lineWidth = hw; sub.forEach(e => { linePath(h, e.pts); h.stroke(); });
+      ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = S.haloAlpha; ctx.drawImage(hc, 0, 0); ctx.restore();
+    }
+    ctx.lineCap = 'round';
+    sub.map(e => [e, (f[e.u] + f[e.v])/2]).sort((a, b) => a[1] - b[1]).forEach(([e, val]) => {
+      const t = tn(val, ST.fMax); ctx.strokeStyle = css(ramp(t)); ctx.lineWidth = (S.segMin + (S.segMax - S.segMin)*t)*u; linePath(ctx, e.pts); ctx.stroke(); });
+    [...hot].sort((a, b) => f[a] - f[b]).forEach(i => { const r = nodeRadius(f[i], ST.fMax, U); nodeDisc(ctx, D.nodes[i], r, tn(f[i], ST.fMax), u); countLabel(ctx, D.nodes[i], X.nodeCnt[i], r, U); });
+  },
+};
+function makeTex(id, v, dispW, T, sym, ins = false){
+  const c = document.createElement('canvas'); c.width = c.height = T;
+  const ctx = c.getContext('2d'), k = T/v.S;
+  ctx.setTransform(k, 0, 0, k, -(v.cx - v.S/2)*k, -(v.cy - v.S/2)*k);
+  const u = v.S/dispW;
+  drawBase(ctx, v, u);
+  DRAW[id](ctx, v, u*sym, T, {ins, raw:u, sym:u*sym});
+  return c;
+}
+
+// ───────────────────────── composición 3D (afín) ─────────────────────────
+const activeLayers = () => LAYERS.filter(L => S['on_'+L.id]);
+const labelOf = (L, i) => (S.prefix ? `(${String.fromCharCode(97+i)}) ` : '') + (S['lbl_'+L.id] || L[S.lang]);
+
+function geom(n){
+  const th = S.rot*Math.PI/180, c = Math.cos(th), s = Math.sin(th), k = Math.abs(c) + Math.abs(s);
+  const ex = S.W/2*k, ey = S.tilt*S.W/2*k, m = 26, fs = S.fontSize;
+  const labW = S.labels === 'left' ? S.labelW : 0;
+  const cx = m + labW + ex, insX = cx + ex + S.insetGap;
+  const width = Math.ceil(S.inset ? insX + S.insetSize + m : cx + ex + m);
+  const capH = S.inset && S.labels === 'inset' ? fs*1.9 : 0;
+  let top = m + ey; if (S.inset) top = Math.max(top, m + S.insetSize/2);
+  const cys = Array.from({length:n}, (_, i) => top + i*S.sep), last = cys[n-1] ?? top;
+  let bottom = last + ey + S.thick + S.shadow*16; if (S.inset) bottom = Math.max(bottom, last + S.insetSize/2 + capH);
+  const legY = bottom + fs*.8, height = Math.ceil(bottom + (S.legend ? fs*3.2 : 0) + m);
+  const P = (cy, u, v) => { const dx = (u-.5)*S.W, dy = (v-.5)*S.W; return [cx + dx*c - dy*s, cy + (dx*s + dy*c)*S.tilt]; };
+  return {th, ex, ey, cx, insX, width, height, cys, P, m, legY, capH};
+}
+const quad = (G, cy) => [[0,0],[1,0],[1,1],[0,1]].map(([u, v]) => G.P(cy, u, v));
+function pathPts(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
+function wrap(ctx, text, maxW){
+  const words = text.split(' '), lines = []; let cur = '';
+  for (const w of words){ const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; } else cur = t; }
+  if (cur) lines.push(cur); return lines;
+}
+
+let texCache = {ver:-1, scale:0, main:{}, inset:{}}, ver = 0;
+function textures(scale, layers, fresh){
+  if (!fresh && (texCache.ver !== ver || texCache.scale !== scale)) texCache = {ver, scale, main:{}, inset:{}};
+  const store = fresh ? {main:{}, inset:{}} : texCache;
+  const mv = mainView(), zv = zoomView();
+  const Tm = Math.min(4096, Math.ceil(S.W*scale*1.25)), Ti = Math.min(2048, Math.ceil(S.insetSize*scale*1.5));
+  for (const L of layers){
+    if (!store.main[L.id]) store.main[L.id] = makeTex(L.id, mv, S.W, Tm, 1);
+    if (S.inset && !store.inset[L.id]) store.inset[L.id] = makeTex(L.id, zv, S.insetSize, Ti, S.insetSym, true);
+  }
+  return store;
+}
+
+function render(canvas, scale, fresh, transparent){
+  const layers = activeLayers(), n = layers.length, G = geom(n);
+  canvas.width = Math.round(G.width*scale); canvas.height = Math.round(G.height*scale);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  if (!transparent){ ctx.fillStyle = S.bg; ctx.fillRect(0, 0, G.width, G.height); }
+  if (!n) return G;
+  const tex = textures(scale, layers, fresh);
+  const fc = hex(S.frameColor), mv = mainView(), zv = zoomView();
+  const zq = cy => [[0,0],[1,0],[1,1],[0,1]].map(([a, b]) => G.P(cy, (zv.cx - zv.S/2 + a*zv.S - (mv.cx - mv.S/2))/mv.S, (zv.cy - zv.S/2 + b*zv.S - (mv.cy - mv.S/2))/mv.S));
+
+  // guías verticales entre esquinas
+  if (S.guides && n > 1){
+    ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = css(fc, .55); ctx.lineWidth = .9;
+    quad(G, G.cys[0]).forEach((p, k) => { const q = quad(G, G.cys[n-1])[k]; ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1] + S.thick); ctx.stroke(); });
+    ctx.restore();
+  }
+  const order = layers.map((_, i) => i); if (S.order === 'physical') order.reverse();
+  for (const i of order){
+    const L = layers[i], cy = G.cys[i], q = quad(G, cy);
+    // sombra
+    if (S.shadow > 0){
+      ctx.save(); ctx.shadowColor = `rgba(0,0,0,${.32*S.shadow})`; ctx.shadowBlur = 22*S.shadow*scale; ctx.shadowOffsetY = (S.thick + 8)*S.shadow*scale;
+      pathPts(ctx, q.map(p => [p[0], p[1] + S.thick])); ctx.fillStyle = S.land; ctx.fill(); ctx.restore();
+    }
+    // canto de la lámina
+    if (S.thick > 0){
+      ctx.fillStyle = css(mixc(fc, [255,255,255], .45));
+      for (let k = 0; k < 4; k++){ const a = q[k], b = q[(k+1)%4]; pathPts(ctx, [a, b, [b[0], b[1]+S.thick], [a[0], a[1]+S.thick]]); ctx.fill(); }
+    }
+    // cara
+    ctx.save(); pathPts(ctx, q); ctx.clip(); ctx.globalAlpha = S.opacity;
+    ctx.translate(G.cx, cy); ctx.scale(1, S.tilt); ctx.rotate(G.th);
+    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(tex.main[L.id], -S.W/2, -S.W/2, S.W, S.W);
+    ctx.restore();
+    ctx.strokeStyle = css(fc); ctx.lineWidth = 1.1; pathPts(ctx, q); ctx.stroke();
+    if (S.inset && S.zoomFrame){ ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = css(fc, .9); ctx.lineWidth = .9; pathPts(ctx, zq(cy)); ctx.stroke(); ctx.restore(); }
+  }
+  // recuadros de zoom y líneas guía
+  if (S.inset){
+    layers.forEach((L, i) => {
+      const cy = G.cys[i], x = G.insX, y = cy - S.insetSize/2, z = zq(cy);
+      const top = z.reduce((a, b) => b[1] < a[1] ? b : a), bot = z.reduce((a, b) => b[1] > a[1] ? b : a);
+      ctx.save(); ctx.setLineDash([4, 3]); ctx.strokeStyle = css(fc, .7); ctx.lineWidth = .9;
+      ctx.beginPath(); ctx.moveTo(top[0], top[1]); ctx.lineTo(x, y); ctx.moveTo(bot[0], bot[1]); ctx.lineTo(x, y + S.insetSize); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.shadowColor = `rgba(0,0,0,${.25*S.shadow})`; ctx.shadowBlur = 10*scale; ctx.shadowOffsetY = 3*scale;
+      ctx.fillStyle = S.land; ctx.fillRect(x, y, S.insetSize, S.insetSize); ctx.restore();
+      ctx.drawImage(tex.inset[L.id], x, y, S.insetSize, S.insetSize);
+      ctx.strokeStyle = css(fc); ctx.lineWidth = 1.1; ctx.strokeRect(x, y, S.insetSize, S.insetSize);
+      if (S.labels === 'inset'){
+        ctx.fillStyle = S.labelColor; ctx.font = `${S.fontSize*.85}px ${S.font}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(labelOf(L, i), x + S.insetSize/2, y + S.insetSize + 5);
+      }
+    });
+  }
+  // etiquetas a la izquierda
+  if (S.labels === 'left'){
+    ctx.fillStyle = S.labelColor; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    layers.forEach((L, i) => {
+      const x = G.cx - G.ex - 10, txt = labelOf(L, i);
+      ctx.font = `${S.fontSize}px ${S.font}`;
+      const lines = wrap(ctx, txt, S.labelW - 12), lh = S.fontSize*1.25;
+      lines.forEach((ln, k) => ctx.fillText(ln, x, G.cys[i] + (k - (lines.length-1)/2)*lh));
+    });
+  }
+  // leyenda
+  if (S.legend){
+    const y = G.legY, fs = S.fontSize*.8, bw = 150, tx = S.lang === 'es' ? ['Delito', 'Baja', 'Alta', 'Intensidad'] : ['Crime event', 'Low', 'High', 'Intensity'];
+    ctx.font = `${fs}px ${S.font}`; ctx.textBaseline = 'middle';
+    const w1 = 14 + ctx.measureText(tx[0]).width, w2 = ctx.measureText(tx[3]).width + 8 + ctx.measureText(tx[1]).width + 6 + bw + 6 + ctx.measureText(tx[2]).width;
+    let x = G.width/2 - (w1 + 28 + w2)/2;
+    const col = hex(S.crimeColor);
+    ctx.beginPath(); ctx.arc(x + 4, y + fs*.6, 3.2, 0, 7); ctx.fillStyle = css(col, S.crimeAlpha); ctx.fill(); ctx.strokeStyle = css(mixc(col, [0,0,0], .35)); ctx.lineWidth = .6; ctx.stroke();
+    ctx.fillStyle = S.labelColor; ctx.textAlign = 'left'; ctx.fillText(tx[0], x + 12, y + fs*.6); x += w1 + 28;
+    ctx.fillText(tx[3], x, y + fs*.6); x += ctx.measureText(tx[3]).width + 8;
+    ctx.fillText(tx[1], x, y + fs*.6); x += ctx.measureText(tx[1]).width + 6;
+    const gr = ctx.createLinearGradient(x, 0, x + bw, 0); for (let k = 0; k <= 10; k++) gr.addColorStop(k/10, css(ramp(k/10)));
+    ctx.fillStyle = gr; ctx.fillRect(x, y + fs*.6 - 5, bw, 10); ctx.strokeStyle = css(fc, .6); ctx.lineWidth = .6; ctx.strokeRect(x, y + fs*.6 - 5, bw, 10);
+    ctx.fillStyle = S.labelColor; ctx.fillText(tx[2], x + bw + 6, y + fs*.6);
+  }
+  return G;
+}
+
+// ───────────────────────── ciclo de render ─────────────────────────
+let pending = 0, level = 0; // 1 = geometría, 2 = texturas, 3 = datos
+function invalidate(l){ level = Math.max(level, l); if (!pending) pending = requestAnimationFrame(flush); }
+function flush(){
+  pending = 0; if (!D) return;
+  const l = level; level = 0;
+  if (l >= 3) derive();
+  if (l >= 2){ if (l < 3) computeHot(); computeStats(); ver++; }
+  const dpr = window.devicePixelRatio || 1, cv = $('#fig');
+  const G = render(cv, dpr, false, false);
+  cv.style.width = G.width + 'px';
+  $('#dims').textContent = `${G.width} × ${G.height} px · exporta ${G.width*+S.exportScale} × ${G.height*+S.exportScale}`;
+  drawMini();
+}
+
+// ───────────────────────── mapa de ubicación ─────────────────────────
+let miniT = null;
+function drawMini(){
+  const cv = $('#mini'), ctx = cv.getContext('2d'), W = cv.width, e = D.extent;
+  const pad = 20, sp = Math.max(e[2]-e[0], e[3]-e[1]), k = (W - 2*pad)/sp, ox = (e[0]+e[2])/2, oy = (e[1]+e[3])/2;
+  const T = p => [W/2 + (p[0]-ox)*k, W/2 + (p[1]-oy)*k]; miniT = {k, ox, oy, W};
+  ctx.fillStyle = '#f7f7f5'; ctx.fillRect(0, 0, W, W);
+  ctx.strokeStyle = '#c3c6cb'; ctx.lineWidth = 1;
+  D.edges.forEach(ed => { ctx.beginPath(); ed.pts.forEach((p, i) => { const q = T(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }); ctx.stroke(); });
+  ctx.fillStyle = css(hex(S.crimeColor), .55); D.crimes.forEach(c => { const q = T(c); ctx.fillRect(q[0]-1.5, q[1]-1.5, 3, 3); });
+  ctx.fillStyle = css(hex(S.c2)); X.hot && X.hot.forEach(i => { const q = T(D.nodes[i]); ctx.beginPath(); ctx.arc(q[0], q[1], 3.5, 0, 7); ctx.fill(); });
+  const rect = (v, col, dash) => { const a = T([v.cx - v.S/2, v.cy - v.S/2]); ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(a[0], a[1], v.S*k, v.S*k); ctx.setLineDash([]); };
+  rect(mainView(), '#1f6feb', []); if (S.inset) rect(zoomView(), '#b4161d', [6, 4]);
+}
+(function miniEvents(){
+  const cv = $('#mini'); let drag = false;
+  const world = ev => { const r = cv.getBoundingClientRect(), s = cv.width/r.width, x = (ev.clientX - r.left)*s, y = (ev.clientY - r.top)*s; return [miniT.ox + (x - miniT.W/2)/miniT.k, miniT.oy + (y - miniT.W/2)/miniT.k]; };
+  const apply = ev => { if (!miniT) return; const [x, y] = world(ev);
+    if (ev.shiftKey){ S.zoomDX = Math.round(x - S.viewX); S.zoomDY = Math.round(y - S.viewY); }
+    else { S.viewX = Math.round(x); S.viewY = Math.round(y); }
+    syncInputs(); save(); invalidate(2); };
+  cv.addEventListener('pointerdown', ev => { drag = true; cv.setPointerCapture(ev.pointerId); apply(ev); });
+  cv.addEventListener('pointermove', ev => { if (drag) apply(ev); });
+  cv.addEventListener('pointerup', () => drag = false);
+  cv.addEventListener('wheel', ev => { ev.preventDefault(); const f = ev.deltaY > 0 ? 1.08 : 1/1.08;
+    if (ev.shiftKey) S.zoomSize = Math.round(clamp(S.zoomSize*f, 40, 1200)); else S.viewSize = Math.round(clamp(S.viewSize*f, 150, 3000));
+    syncInputs(); save(); invalidate(2); }, {passive:false});
+})();
+
+// ───────────────────────── controles ─────────────────────────
+const isLima = () => S.source === 'lima', isOsm = () => S.source === 'osm', notLima = () => S.source !== 'lima';
+const FONTS = [['Georgia','Georgia'],['"Times New Roman", Times, serif','Times New Roman'],['Arial, Helvetica, sans-serif','Arial / Helvetica'],['"Segoe UI", system-ui, sans-serif','Segoe UI'],['Garamond, serif','Garamond'],['"Courier New", monospace','Courier New']];
+function schema(){
+  const hs = (D && D.hotspots || []).map((h, i) => [i, `${h.name} (${h.nodes.length} nodos)`]);
+  const layerItems = [];
+  const P = {
+    raw:   [],
+    kde:   [['kdeBw','Ancho de banda (m)','range',{min:15,max:250,step:5},3],['kdeAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['kdeCut','Umbral transparente','range',{min:0,max:.4,step:.01},2],['kdeDots','Mostrar puntos','check',0,2]],
+    census:[['censusN','Bloques por lado','range',{min:2,max:9,step:1},2],['censusMode','Coloreado','select',[['choro','Coropleta (conteo)'],['cat','Categórico pastel (como la imagen)']],2],['censusAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['censusDots','Mostrar puntos','check',0,2]],
+    grid:  [['gridN','Celdas por lado','range',{min:4,max:40,step:1},2],['gridAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['gridDots','Mostrar puntos','check',0,2]],
+    inter: [['interMin','Radio mínimo (px)','range',{min:.5,max:8,step:.1},2],['interMax','Radio máximo (px)','range',{min:3,max:24,step:.5},2],['interEmpty','Nodos sin delitos','check',0,2],
+            ['snapR','Radio de captura de la esquina (m, 0 = sin límite)','range',{min:0,max:150,step:1},3],['cMinCount','Mínimo de delitos para dibujar','range',{min:1,max:20,step:1},2],
+            ['cScale','Escala del radio','select',[['sqrt','√ conteo (área ∝ conteo)'],['linear','Lineal'],['log','Logarítmica']],2],
+            ['cRef','Conteo para el radio máximo (0 = auto)','range',{min:0,max:150,step:1},2]],
+    seg:   [['segMin','Grosor mínimo (px)','range',{min:.3,max:6,step:.1},2],['segMax','Grosor máximo (px)','range',{min:2,max:20,step:.5},2],['segNorm','Medida','select',[['count','Conteo'],['density','Conteo / longitud']],2]],
+    topo:  [['realHot','Hotspot real del pipeline','check',0,2,isLima],['subQ','Umbral del subgrafo (×máx)','range',{min:.05,max:.9,step:.01},2,() => !(isLima() && S.realHot)],['haloW','Ancho del halo (px)','range',{min:0,max:60,step:1},2],['haloAlpha','Opacidad del halo','range',{min:0,max:1,step:.01},2],['topoContext','Nodos de contexto','check',0,2]],
+  };
+  LAYERS.forEach(L => { layerItems.push(['@'+L.id]); layerItems.push(...P[L.id]); });
+  return [
+    ['Datos y ubicación', true, [
+      ['source','Fuente','select',[['lima', LIMA && LIMA.meta.synthetic ? 'Ciudad sintética con hotspots (ejemplo)' : 'Lima — datos reales del pipeline'],['osm','OpenStreetMap — cualquier lugar'],['synth','Red sintética (sin conexión)']],3],
+      ['hotspot','Hotspot','select',hs,4,isLima],
+      ['osmLat','Latitud','num',{step:.0001},0,isOsm],
+      ['osmLon','Longitud','num',{step:.0001},0,isOsm],
+      ['osmRadius','Radio de descarga (m)','range',{min:300,max:1500,step:50},0,isOsm],
+      ['!loadOsm','Descargar calles de OSM','button',0,0,isOsm],
+      ['!osmBg','Añadir edificios y parques (OSM)','button',0,0,() => isLima() && D && D.origin],
+      ['nCrimes','Delitos simulados','range',{min:50,max:1500,step:10},3,notLima],
+      ['lambda','Decaimiento del hotspot (m)','range',{min:40,max:400,step:5},3,notLima],
+      ['seed','Semilla aleatoria','num',{step:1},3],
+      ['viewSize','Ventana del mapa (m)','range',{min:150,max:3000,step:10},2],
+      ['viewX','Centro X (m, este)','range',{min:-1500,max:1500,step:5},2],
+      ['viewY','Centro Y (m, sur)','range',{min:-1500,max:1500,step:5},2],
+      ['!center','Centrar en el hotspot','button'],
+    ]],
+    ['Rectángulos y apilado', true, [
+      ['W','Tamaño del rectángulo (px)','range',{min:200,max:800,step:5},2],
+      ['rot','Rotación (°)','range',{min:-60,max:60,step:1},1],
+      ['tilt','Inclinación (alto/ancho)','range',{min:.2,max:1,step:.01},1],
+      ['sep','Separación entre capas (px)','range',{min:30,max:400,step:1},1],
+      ['thick','Grosor de la lámina (px)','range',{min:0,max:16,step:.5},1],
+      ['opacity','Opacidad de la lámina','range',{min:.5,max:1,step:.01},1],
+      ['order','Solape','select',[['physical','La de arriba tapa a la de abajo'],['image','La de abajo tapa a la de arriba (como la imagen)']],1],
+      ['shadow','Sombra','range',{min:0,max:1,step:.05},1],
+      ['guides','Guías verticales punteadas','check',0,1],
+      ['frameColor','Color de bordes y guías','color',0,1],
+    ]],
+    ['Recuadros de zoom', false, [
+      ['inset','Mostrar recuadros','check',0,2],
+      ['insetSize','Tamaño (px)','range',{min:60,max:320,step:2},2],
+      ['insetGap','Distancia al apilado (px)','range',{min:10,max:250,step:2},1],
+      ['zoomSize','Área ampliada (m)','range',{min:40,max:1200,step:5},2],
+      ['zoomDX','Desplazamiento X (m)','range',{min:-800,max:800,step:5},2],
+      ['zoomDY','Desplazamiento Y (m)','range',{min:-800,max:800,step:5},2],
+      ['insetSym','Escala de símbolos en el zoom','range',{min:.5,max:3,step:.05},2],
+      ['cIndep','Círculos de esquina con radios propios','check',0,2],
+      ['cMinI','Círculo: radio mínimo en el zoom (px)','range',{min:.5,max:20,step:.1},2,() => S.cIndep],
+      ['cMaxI','Círculo: radio máximo en el zoom (px)','range',{min:2,max:45,step:.5},2,() => S.cIndep],
+      ['cLabels','Número de delitos dentro del círculo','check',0,2],
+      ['cLabelMin','Mostrar número desde','range',{min:1,max:50,step:1},2,() => S.cLabels],
+      ['zoomFrame','Marcar el área en cada capa','check',0,1],
+    ]],
+    ['Colores', false, [
+      ['preset','Gradiente predefinido','select',[['rojos','Rojos (como la imagen)'],['magma','Magma'],['inferno','Inferno'],['viridis','Viridis'],['azules','Azules'],['grises','Grises (impresión B/N)'],['custom','Personalizado']],2],
+      ['c0','Gradiente: bajo','color',0,2],['c1','Gradiente: medio','color',0,2],['c2','Gradiente: alto','color',0,2],
+      ['gamma','Contraste (gamma)','range',{min:.3,max:1.5,step:.05},2],
+      ['sat','Saturación (fracción del máximo)','range',{min:.1,max:1,step:.01},2],
+      ['crimeColor','Color de los delitos','color',0,2],
+      ['crimeR','Radio de los delitos (px)','range',{min:.6,max:6,step:.1},2],
+      ['crimeAlpha','Opacidad de los delitos','range',{min:.2,max:1,step:.01},2],
+      ['spread','Dispersar repetidos (m)','range',{min:0,max:25,step:.5},3],
+      ['land','Manzanas / fondo','color',0,2],['building','Edificios','color',0,2],['street','Calles','color',0,2],['avenue','Avenidas','color',0,2],['park','Parques','color',0,2],['water','Agua','color',0,2],
+      ['streetScale','Ancho de calles','range',{min:.3,max:2.5,step:.05},2],
+      ['baseFade','Atenuar mapa base','range',{min:0,max:.7,step:.01},2],
+      ['bg','Fondo de la figura','color',0,1],
+    ]],
+    ['Capas', false, layerItems],
+    ['Etiquetas y leyenda', false, [
+      ['labels','Etiquetas','select',[['left','A la izquierda'],['inset','Bajo cada recuadro'],['none','Sin etiquetas']],1],
+      ['labelW','Ancho de columna (px)','range',{min:60,max:320,step:2},1,() => S.labels === 'left'],
+      ['lang','Idioma','select',[['en','English'],['es','Español']],1],
+      ['prefix','Prefijos (a), (b)…','check',0,1],
+      ['font','Tipografía','select',FONTS,1],
+      ['fontSize','Tamaño de letra','range',{min:8,max:28,step:.5},1],
+      ['labelColor','Color del texto','color',0,1],
+      ['legend','Leyenda inferior','check',0,1],
+    ]],
+    ['Exportar', true, [
+      ['exportScale','Escala de exportación','select',[['2','2× (pantalla)'],['3','3×'],['4','4× (≈600 ppp a 8 cm)'],['6','6×']],1],
+      ['transparent','Fondo transparente','check',0,0],
+      ['!png','Descargar PNG','button','pri'],
+      ['!json','Guardar configuración (.json)','button'],
+      ['!load','Cargar configuración…','button'],
+      ['!reset','Restablecer valores','button'],
+    ]],
+  ];
+}
+const rows = [];
+function buildControls(){
+  const root = $('#controls'), openState = {}; root.querySelectorAll('details').forEach(d => openState[d.dataset.k] = d.open);
+  root.innerHTML = ''; rows.length = 0;
+  for (const [title, open, items] of schema()){
+    const det = document.createElement('details'); det.dataset.k = title; det.open = title in openState ? openState[title] : open;
+    det.innerHTML = `<summary>${title}</summary>`; root.appendChild(det);
+    for (const it of items){
+      const [key, label, type, opt, lvl = 2, show] = it;
+      if (key[0] === '@'){
+        const L = LAYERS.find(l => l.id === key.slice(1)), h = document.createElement('div'); h.className = 'head';
+        h.innerHTML = `<input type="checkbox" ${S['on_'+L.id] ? 'checked' : ''}><input type="text" placeholder="${L.en} / ${L.es}" value="${(S['lbl_'+L.id] || '').replace(/"/g,'&quot;')}">`;
+        const [cb, tx] = h.querySelectorAll('input');
+        cb.onchange = () => { S['on_'+L.id] = cb.checked; save(); invalidate(2); };
+        tx.oninput = () => { S['lbl_'+L.id] = tx.value; save(); invalidate(1); };
+        det.appendChild(h); continue;
+      }
+      if (key[0] === '!'){
+        const b = document.createElement('button'); b.textContent = label; if (opt === 'pri') b.className = 'pri';
+        b.onclick = () => ACTIONS[key.slice(1)](); det.appendChild(b); rows.push({el:b, show}); continue;
+      }
+      const row = document.createElement('div'); row.className = 'row' + (type === 'range' ? '' : ' wide');
+      const lab = document.createElement('label'); lab.textContent = label; row.appendChild(lab);
+      let inp;
+      if (type === 'select'){ inp = document.createElement('select'); opt.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; inp.appendChild(o); }); inp.value = String(S[key]); }
+      else { inp = document.createElement('input'); inp.type = type === 'check' ? 'checkbox' : type === 'num' ? 'number' : type;
+        if (opt && typeof opt === 'object') Object.assign(inp, opt);
+        if (type === 'check') inp.checked = !!S[key]; else inp.value = S[key]; }
+      row.appendChild(inp);
+      const val = document.createElement('span'); val.className = 'val'; if (type === 'range'){ val.textContent = S[key]; row.appendChild(val); }
+      const onv = () => {
+        let v = type === 'check' ? inp.checked : (type === 'range' || type === 'num') ? +inp.value : inp.value;
+        if (key === 'hotspot' || key === 'censusN' || key === 'gridN') v = +v;
+        S[key] = v; val.textContent = v;
+        if (key === 'preset' && PRESETS[v]){ [S.c0, S.c1, S.c2] = PRESETS[v]; syncInputs(); }
+        if (['c0','c1','c2'].includes(key)){ S.preset = 'custom'; syncInputs(); }
+        save();
+        if (key === 'source'){ loadData().then(() => { derive(); centerHot(); invalidate(3); }); return; }
+        if (key === 'hotspot'){ centerHot(); }
+        if (lvl) invalidate(lvl);
+        refreshVis();
+      };
+      inp.addEventListener(type === 'range' || type === 'text' ? 'input' : 'change', onv);
+      det.appendChild(row); rows.push({el:row, show, key, inp, val, type});
+    }
+  }
+  refreshVis();
+}
+function refreshVis(){ rows.forEach(r => r.el.style.display = r.show && !r.show() ? 'none' : ''); }
+function syncInputs(){ rows.forEach(r => { if (!r.key) return; if (r.type === 'check') r.inp.checked = !!S[r.key]; else r.inp.value = S[r.key]; if (r.val) r.val.textContent = S[r.key]; }); }
+function centerHot(){
+  const [x, y] = hotspotCenter(); S.viewX = Math.round(x); S.viewY = Math.round(y); S.zoomDX = 0; S.zoomDY = 0;
+  // el zoom va al nodo más intenso del hotspot (la «cruz» de la figura)
+  const ns = D.hotspots && D.hotspots[S.hotspot] ? D.hotspots[S.hotspot].nodes : [];
+  if (X.f && ns.length){ const m = ns.reduce((a, b) => X.f[b] > X.f[a] ? b : a); S.zoomDX = Math.round(D.nodes[m][0] - x); S.zoomDY = Math.round(D.nodes[m][1] - y); }
+  syncInputs(); save();
+}
+
+const ACTIONS = {
+  center(){ centerHot(); invalidate(2); },
+  async loadOsm(){ D = null; await loadData(); centerHot(); invalidate(3); },
+  async osmBg(){
+    if (!D.origin) return;
+    status('Descargando edificios y parques…');
+    try {
+      const o = await fetchOsm(D.origin[0] + S.viewX/(Math.cos(D.origin[1]*Math.PI/180)*111320), D.origin[1] - S.viewY/110540, S.viewSize*0.75, false);
+      // fetchOsm proyecta respecto al centro pedido; se lleva al origen del recorte
+      const sh = p => p.map(q => [q[0] + S.viewX, q[1] + S.viewY]);
+      D.buildings = o.buildings.map(sh); D.parks = o.parks.map(sh); D.water = o.water.map(sh);
+      status(`${D.label} · +${o.buildings.length} edificios, ${o.parks.length} parques`); invalidate(2);
+    } catch (e) { status('OSM no respondió: ' + e.message, true); }
+  },
+  png(){
+    const cv = document.createElement('canvas'), sc = +S.exportScale;
+    render(cv, sc, true, S.transparent);
+    cv.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `figura_capas_${sc}x.png`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }, 'image/png');
+  },
+  json(){ const b = new Blob([JSON.stringify(S, null, 2)], {type:'application/json'}), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'figura_capas_config.json'; a.click(); },
+  load(){
+    const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+    i.onchange = async () => { try { Object.assign(S, JSON.parse(await i.files[0].text())); save(); await loadData(); invalidate(3); } catch (e) { status('Configuración inválida', true); } };
+    i.click();
+  },
+  async reset(){ S = Object.assign({}, DEFAULTS); save(); await loadData(); centerHot(); invalidate(3); },
+};
+
+// ───────────────────────── arranque ─────────────────────────
+(async () => {
+  const first = !localStorage.getItem(KEY);
+  await loadData();
+  derive();
+  if (first) centerHot();
+  invalidate(3);
+})();
+</script>
+</body>
+</html>
