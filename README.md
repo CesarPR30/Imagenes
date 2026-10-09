@@ -15,7 +15,12 @@ Las imágenes exportadas están en [`img/`](img/), en PNG y en SVG vectorial.
 
 ## Datos
 
-Lo publicado aquí usa **datos sintéticos** (`data/sintetico/`): una ciudad inventada con calles, lotes y parques, y delitos simulados a lo largo de brazos viales que se encienden y apagan mes a mes. El hotspot de cada mes se obtiene como en el método: densidad gaussiana sobre la distancia de red (σ = 120 m, truncada en 3σ) y el componente conexo de los nodos que superan una fracción del pico. Ningún dato proviene de denuncias reales.
+Lo publicado aquí (`data/sintetico/`) combina:
+
+- **Red vial real de Lima**: calles de OpenStreetMap (la misma red del pipeline), con edificios y parques de OSM. Los barrios se eligen automáticamente entre catorce candidatos por ser los **menos cuadriculados**, según la entropía de orientación de sus calles (Boeing, 2019): Barranco para la figura de capas; Pueblo Libre, El Agustino e Independencia para la temporal. En cada barrio se toma la esquina con más forma de cruce.
+- **Delitos simulados**: se reparten a lo largo de los «brazos» que siguen las calles reales desde esa esquina (en cada intersección, la continuación más recta), con intensidades que cambian mes a mes y un mes de apagón.
+
+El hotspot de cada mes se obtiene como en el método: densidad gaussiana sobre la distancia de red (σ = 120 m, truncada en 3σ) y el componente conexo de los nodos que superan una fracción del pico. Ninguna denuncia es real; los barrios no se eligieron por su criminalidad.
 
 Las figuras del paper con datos de Lima se generan con las mismas páginas desde el repositorio del pipeline, con `?data=data/lima` y los archivos que escriben `scripts/build_explainer_data.py` y `scripts/build_temporal_data.py`. Los datos sintéticos se regeneran con `scripts/build_synthetic_figure_data.py --out data/sintetico`.
 

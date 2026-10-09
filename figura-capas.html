@@ -83,10 +83,10 @@ const DEFAULTS = {
   land:'#e4e4e1', building:'#d1d1ce', street:'#ffffff', avenue:'#f7dcae', park:'#c4dcae', water:'#bcd6ec', streetScale:1, baseFade:0.12,
   kdeBw:55, kdeAlpha:0.88, kdeCut:0.05, kdeDots:true,
   censusN:4, censusMode:'choro', censusAlpha:0.62, censusDots:true,
-  gridN:14, gridAlpha:0.85, gridDots:false,
+  gridN:14, gridAlpha:0.85, gridDots:false, gridLine:'#5f6873', gridLineW:1, gridLineAlpha:0.75, gridEmpty:0.06,
   interMin:1.6, interMax:10, interEmpty:true,
   snapR:0, cScale:'sqrt', cRef:0, cMinCount:1, cMinI:3, cMaxI:16, cIndep:false, cLabels:false, cLabelMin:3,
-  segMin:1.2, segMax:6.5, segNorm:'count',
+  segMin:1.2, segMax:6.5, segNorm:'count', segGap:3.5, segAll:true, segBase:'#b9bec6', segNodes:true,
   subQ:0.35, haloW:20, haloAlpha:0.45, topoContext:true,
   labels:'left', labelW:150, lang:'en', prefix:true, font:'Georgia', fontSize:14, labelColor:'#222222', legend:true,
   bg:'#ffffff', transparent:false, exportScale:'4', exportFormat:'png',
@@ -376,6 +376,14 @@ function computeStats(){
 // ───────────────────────── dibujo de cada lámina (coordenadas en metros) ─────────────────────────
 function polyPath(ctx, p){ ctx.beginPath(); p.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); }
 function linePath(ctx, pts){ ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); }
+// Polilínea recortada `d` metros por cada extremo; null si el tramo es más corto que el recorte.
+function trimLine(pts, d){
+  const L = plen(pts); if (d <= 0) return pts; if (L <= 2*d + 1e-6) return null;
+  const a = pointAt(pts, d), b = pointAt(pts, L - d), out = [[a[0], a[1]]];
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++){ acc += Math.hypot(pts[i][0]-pts[i-1][0], pts[i][1]-pts[i-1][1]); if (acc > d && acc < L - d) out.push(pts[i]); }
+  out.push([b[0], b[1]]); return out;
+}
 const edgeVisible = (e, v, m) => !(e.bb[2] < v.cx - v.S/2 - m || e.bb[0] > v.cx + v.S/2 + m || e.bb[3] < v.cy - v.S/2 - m || e.bb[1] > v.cy + v.S/2 + m);
 const STREET_W = {avenue:17, collector:11, street:7.5, service:4.5};
 
@@ -445,10 +453,11 @@ const DRAW = {
   grid(ctx, v, u){
     const g = S.gridN, gs = ST.gs;
     for (let j = 0; j < g; j++) for (let i = 0; i < g; i++){
-      const c = ST.gcnt[j*g+i]; if (!c) continue;
+      const c = ST.gcnt[j*g+i];
+      if (!c){ if (S.gridEmpty > 0){ ctx.fillStyle = css(hex(S.gridLine), S.gridEmpty); ctx.fillRect(ST.gx0 + i*gs, ST.gy0 + j*gs, gs, gs); } continue; }
       ctx.fillStyle = css(ramp(tn(c, ST.gmax)), S.gridAlpha); ctx.fillRect(ST.gx0 + i*gs, ST.gy0 + j*gs, gs, gs);
     }
-    ctx.strokeStyle = 'rgba(120,128,138,.55)'; ctx.lineWidth = .7*u; ctx.beginPath();
+    ctx.strokeStyle = css(hex(S.gridLine), S.gridLineAlpha); ctx.lineWidth = S.gridLineW*u; ctx.lineCap = 'butt'; ctx.beginPath();
     for (let k = 0; k <= g; k++){ ctx.moveTo(ST.gx0 + k*gs, ST.gy0); ctx.lineTo(ST.gx0 + k*gs, ST.gy0 + g*gs); ctx.moveTo(ST.gx0, ST.gy0 + k*gs); ctx.lineTo(ST.gx0 + g*gs, ST.gy0 + k*gs); }
     ctx.stroke();
     if (S.gridDots) drawDots(ctx, v, u*.8, .8);
@@ -464,12 +473,21 @@ const DRAW = {
     }
   },
   seg(ctx, v, u){
+    // Cada tramo entre dos intersecciones se recorta en sus extremos para que se lea como una pieza propia.
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const ids = D.edges.map((_, i) => i).filter(i => ST.segVal[i] > 0 && edgeVisible(D.edges[i], v, 20)).sort((a, b) => ST.segVal[a] - ST.segVal[b]);
-    for (const i of ids){
-      const t = tn(ST.segVal[i], ST.segMax);
-      ctx.strokeStyle = css(ramp(t)); ctx.lineWidth = (S.segMin + (S.segMax - S.segMin)*t)*u;
-      linePath(ctx, D.edges[i].pts); ctx.stroke();
+    const vis = D.edges.map((_, i) => i).filter(i => edgeVisible(D.edges[i], v, 20));
+    if (S.segAll){
+      ctx.strokeStyle = S.segBase; ctx.lineWidth = S.segMin*u;
+      for (const i of vis) if (!(ST.segVal[i] > 0)){ const p = trimLine(D.edges[i].pts, (S.segGap + S.segMin/2)*u); if (p){ linePath(ctx, p); ctx.stroke(); } }
+    }
+    vis.filter(i => ST.segVal[i] > 0).sort((a, b) => ST.segVal[a] - ST.segVal[b]).forEach(i => {
+      const t = tn(ST.segVal[i], ST.segMax), w = S.segMin + (S.segMax - S.segMin)*t, p = trimLine(D.edges[i].pts, (S.segGap + w/2)*u);
+      if (!p) return;
+      ctx.strokeStyle = css(ramp(t)); ctx.lineWidth = w*u; linePath(ctx, p); ctx.stroke();
+    });
+    if (S.segNodes){
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = css(hex(S.frameColor), .7); ctx.lineWidth = .6*u;
+      D.nodes.forEach(p => { if (inView(p, v, 5)){ ctx.beginPath(); ctx.arc(p[0], p[1], Math.max(1.2, S.segGap*.45)*u, 0, 7); ctx.fill(); ctx.stroke(); } });
     }
   },
   topo(ctx, v, u, T, U){
@@ -679,12 +697,16 @@ function schema(){
     raw:   [],
     kde:   [['kdeBw','Ancho de banda (m)','range',{min:15,max:250,step:5},3],['kdeAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['kdeCut','Umbral transparente','range',{min:0,max:.4,step:.01},2],['kdeDots','Mostrar puntos','check',0,2]],
     census:[['censusN','Bloques por lado','range',{min:2,max:9,step:1},2],['censusMode','Coloreado','select',[['choro','Coropleta (conteo)'],['cat','Categórico pastel (como la imagen)']],2],['censusAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['censusDots','Mostrar puntos','check',0,2]],
-    grid:  [['gridN','Celdas por lado','range',{min:4,max:40,step:1},2],['gridAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['gridDots','Mostrar puntos','check',0,2]],
+    grid:  [['gridN','Celdas por lado','range',{min:4,max:40,step:1},2],['gridAlpha','Opacidad','range',{min:.1,max:1,step:.01},2],['gridDots','Mostrar puntos','check',0,2],
+            ['gridLine','Color de las líneas','color',0,2],['gridLineW','Grosor de las líneas (px)','range',{min:.2,max:4,step:.1},2],['gridLineAlpha','Opacidad de las líneas','range',{min:0,max:1,step:.01},2],
+            ['gridEmpty','Tinte de celdas vacías','range',{min:0,max:.4,step:.01},2]],
     inter: [['interMin','Radio mínimo (px)','range',{min:.5,max:8,step:.1},2],['interMax','Radio máximo (px)','range',{min:3,max:24,step:.5},2],['interEmpty','Nodos sin delitos','check',0,2],
             ['snapR','Radio de captura de la esquina (m, 0 = sin límite)','range',{min:0,max:150,step:1},3],['cMinCount','Mínimo de delitos para dibujar','range',{min:1,max:20,step:1},2],
             ['cScale','Escala del radio','select',[['sqrt','√ conteo (área ∝ conteo)'],['linear','Lineal'],['log','Logarítmica']],2],
             ['cRef','Conteo para el radio máximo (0 = auto)','range',{min:0,max:150,step:1},2]],
-    seg:   [['segMin','Grosor mínimo (px)','range',{min:.3,max:6,step:.1},2],['segMax','Grosor máximo (px)','range',{min:2,max:20,step:.5},2],['segNorm','Medida','select',[['count','Conteo'],['density','Conteo / longitud']],2]],
+    seg:   [['segMin','Grosor mínimo (px)','range',{min:.3,max:6,step:.1},2],['segMax','Grosor máximo (px)','range',{min:2,max:20,step:.5},2],['segNorm','Medida','select',[['count','Conteo'],['density','Conteo / longitud']],2],
+            ['segGap','Separación en las esquinas (px)','range',{min:0,max:12,step:.25},2],['segAll','Dibujar también tramos sin delitos','check',0,2],
+            ['segBase','Color de tramos sin delitos','color',0,2],['segNodes','Marcar las intersecciones','check',0,2]],
     topo:  [['realHot','Hotspot real del pipeline','check',0,2,isLima],['subQ','Umbral del subgrafo (×máx)','range',{min:.05,max:.9,step:.01},2,() => !(isLima() && S.realHot)],['haloW','Ancho del halo (px)','range',{min:0,max:60,step:1},2],['haloAlpha','Opacidad del halo','range',{min:0,max:1,step:.01},2],['topoContext','Nodos de contexto','check',0,2]],
   };
   LAYERS.forEach(L => { layerItems.push(['@'+L.id]); layerItems.push(...P[L.id]); });
