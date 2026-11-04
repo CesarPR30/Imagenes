@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validación sintética</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, dot, line, text, rich, panelTitle, scale, axisBox, legend, INK, MUTED} = FigKit;
+page({
+  key:'figura-validacion', name:'figura_validacion', title:'Validación sintética',
+  sub:'Detección frente a una verdad conocida y sensibilidad a los parámetros.',
+  defaults:{W:2000, H:640, top:56, bottom:124, left:64, right:36, gap:90, ratio:1.25, fontSize:32, barW:.27, lineW:3.4, ptR:5,
+    font:'Georgia', topo:'#1f2328', voraz:'#e89a1c', anchura:'#9aa3ab', use:'#b3131b'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:1000,max:3000,step:10}],['H','Alto','range',{min:360,max:1200,step:10}],['gap','Separación','range',{min:30,max:160,step:2}],['ratio','Ancho panel a','range',{min:.8,max:2,step:.05}]]],
+    ['Trazos', true, [['barW','Barras','range',{min:.1,max:.33,step:.01}],['lineW','Líneas','range',{min:1,max:8,step:.2}],['ptR','Puntos','range',{min:1,max:10,step:.5}]]],
+    ['Colores', true, [['topo','Topológico','color'],['voraz','Voraz','color'],['anchura','Anchura','color'],['use','Valor en uso','color']]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}]]],
+  ],
+  size:S=>[S.W,S.H],
+  draw(ctx,S,D){
+    const Vd=D.validation, keys=['topologico','voraz','anchura'], names={topologico:'Topological',voraz:'Greedy BFS',anchura:'Plain BFS'}, col={topologico:S.topo,voraz:S.voraz,anchura:S.anchura};
+    const fs=S.fontSize*.84, h=S.H-S.top-S.bottom, y0=S.top, un=(S.W-S.left-S.right-2*S.gap)/(S.ratio+2), wa=un*S.ratio;
+    const yaxis=(x,w,Y)=>{ axisBox(ctx,x,y0,w,h); [0,.25,.5,.75,1].forEach(v=>{ line(ctx,x-6,Y(v),x,Y(v),MUTED,1.4); text(ctx,String(v),x-11,Y(v)+fs*.34,`${fs}px ${S.font}`,INK,'right'); }); };
+    // (a)
+    const x=S.left, Y=scale(0,1.04,y0+h,y0), groups=[['ppv',[['PPV']]],['sensitivity',[['Sensitivity']]],['f1',[['F','i'],['1','sub']]]], gw=wa/3;
+    yaxis(x,wa,Y);
+    groups.forEach(([m,lab],g)=>{
+      keys.forEach((k,j)=>{ const s=Vd.methods[k][m], bw=gw*S.barW, bx=x+gw*(g+.5)+(j-1)*bw-bw/2;
+        ctx.fillStyle=col[k]; ctx.fillRect(bx,Y(s.mean),bw*.94,y0+h-Y(s.mean));
+        const cx=bx+bw*.47, a=Y(s.mean-s.sd), b=Y(Math.min(1.04,s.mean+s.sd)); line(ctx,cx,a,cx,b,'#6b747c',1.8); line(ctx,cx-6,a,cx+6,a,'#6b747c',1.8); line(ctx,cx-6,b,cx+6,b,'#6b747c',1.8); });
+      rich(ctx,lab,x+gw*(g+.5),y0+h+fs*1.3,S,{size:fs,align:'center'});
+    });
+    panelTitle(ctx,'a','Calibrated regime',0,S.top-18,S);
+    // (b, c)
+    [['sigma',[['σ','i'],[' (m)']],[['σ','i']],'b'],['f_min',[['f','i'],['min','sub'],[' ratio']],[['f','i'],['min','sub']],'c']].forEach(([ax,lab,sym,L],i)=>{
+      const P=Vd.sweeps[ax], px=S.left+wa+S.gap+i*(un+S.gap), lo=Math.min(...P.x), hi=Math.max(...P.x), X=scale(lo,hi,px+8,px+un-8);
+      yaxis(px,un,Y);
+      line(ctx,X(P.use),y0,X(P.use),y0+h,S.use,2.4);
+      const path=(a,c,dash,w)=>{ctx.strokeStyle=c; ctx.lineWidth=w; ctx.setLineDash(dash||[]); ctx.lineJoin='round'; ctx.beginPath(); a.forEach((v,q)=>{q?ctx.lineTo(X(P.x[q]),Y(v)):ctx.moveTo(X(P.x[q]),Y(v));}); ctx.stroke(); ctx.setLineDash([]);};
+      path(P.ppv,S.topo,[3,6],S.lineW*.8); path(P.sens,S.topo,[12,7],S.lineW*.8);
+      keys.slice().reverse().forEach(k=>{ path(P.f1[k],col[k],null,S.lineW); P.f1[k].forEach((v,q)=>dot(ctx,X(P.x[q]),Y(v),S.ptR,col[k])); });
+      P.x.forEach((v,q)=>{ if(q%2===0||P.x.length<6){ line(ctx,X(v),y0+h,X(v),y0+h+6,MUTED,1.4); text(ctx,String(v),X(v),y0+h+fs*1.3,`${fs}px ${S.font}`,INK,'center'); }});
+      rich(ctx,lab,px+un/2,y0+h+fs*2.55,S,{size:fs,align:'center',color:MUTED});
+      panelTitle(ctx,L,[['F','i'],['1','sub'],[' vs '],...sym],px-S.left*.6,S.top-18,S);
+    });
+    const items=[...keys.map(k=>({label:names[k],draw:(c,a,b,w)=>{line(c,a-w/2,b,a+w/2,b,col[k],S.lineW);dot(c,a,b,S.ptR,col[k]);}})),
+      {label:'PPV (topological)',draw:(c,a,b,w)=>line(c,a-w/2,b,a+w/2,b,S.topo,S.lineW*.8,[3,6])},
+      {label:'sensitivity (topological)',draw:(c,a,b,w)=>line(c,a-w/2,b,a+w/2,b,S.topo,S.lineW*.8,[12,7])},
+      {label:'value in use',draw:(c,a,b,w)=>line(c,a-w/2,b,a+w/2,b,S.use,2.4)}];
+    legend(ctx,items,S.left,S.H-14,S,{size:.82,key:48,gap:30});
+  },
+});
+</script>
+</body>
+</html>

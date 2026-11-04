@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selección mensual</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, line, text, panelTitle, scale, axisBox, legend, INK, MUTED} = FigKit;
+page({
+  key:'figura-seleccion', name:'figura_seleccion', title:'Selección mensual',
+  sub:'Regiones candidatas y significativas por mes, y umbral de la prueba de Monte Carlo.',
+  defaults:{W:1000, H:720, left:64, right:66, top:48, mid:64, bottom:38, ratio:.56, fontSize:24, barW:.84, lineW:2.6,
+    font:'Georgia', cand:'#dde0e3', kept:'#1f2328', crime:'#b3131b', nullC:'#9aa3ab', band:'#f2d7a6', bandA:.38, a:'Regions kept each month', b:'Significance threshold per month'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['H','Alto','range',{min:420,max:1200,step:10}],['ratio','Reparto (a/b)','range',{min:.35,max:.7,step:.01}],['barW','Ancho de barra','range',{min:.4,max:1,step:.02}],['lineW','Líneas','range',{min:1,max:6,step:.2}]]],
+    ['Colores', true, [['cand','Candidatas','color'],['kept','Significativas','color'],['crime','Eventos','color'],['nullC','Nulo','color'],['band','Banda','color'],['bandA','Opacidad banda','range',{min:0,max:1,step:.02}]]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}],['a','Panel a','text'],['b','Panel b','text']]],
+  ],
+  size:S=>[S.W,S.H],
+  draw(ctx,S,D){
+    const C=D.scan, n=C.months.length, fs=S.fontSize*.82, x0=S.left, w=S.W-S.left-S.right, ih=S.H-S.top-S.mid-S.bottom;
+    const h1=ih*S.ratio, h2=ih-h1, y1=S.top, y2=S.top+h1+S.mid, X=i=>x0+(i+.5)*w/n, bw=S.barW*w/n, ic=C.months.indexOf(C.caveat);
+    const ticks=C.months.map((m,i)=>[m,i]).filter(([m])=>m.endsWith('-01'));
+    const nice=m=>{const e=Math.pow(10,Math.floor(Math.log10(m))),r=m/e;return (r<=2?.5:r<=5?1:2)*e;};
+    const yticks=(Yf,max,x,al,col,fmt)=>{const st=nice(max);for(let v=0;v<=max+1e-9;v+=st)text(ctx,fmt?fmt(v):String(v),x,Yf(v)+fs*.34,`${fs}px ${S.font}`,col,al);};
+    if(ic>=0) for(const [y,h] of [[y1,h1],[y2,h2]]){ ctx.save(); ctx.globalAlpha=S.bandA; ctx.fillStyle=S.band; ctx.fillRect(x0+ic*w/n,y,w-ic*w/n,h); ctx.restore(); }
+    // (a)
+    const maxC=Math.max(...C.candidates)*1.34, Y1=scale(0,maxC,y1+h1,y1), maxE=Math.max(...C.events)*1.34, E=scale(0,maxE,y1+h1,y1);
+    C.candidates.forEach((v,i)=>{ctx.fillStyle=S.cand; ctx.fillRect(X(i)-bw/2,Y1(v),bw,y1+h1-Y1(v));});
+    C.kept.forEach((v,i)=>{ctx.fillStyle=S.kept; ctx.fillRect(X(i)-bw/2,Y1(v),bw,y1+h1-Y1(v));});
+    ctx.strokeStyle=S.crime; ctx.lineWidth=S.lineW; ctx.lineJoin='round'; ctx.beginPath(); C.events.forEach((v,i)=>{i?ctx.lineTo(X(i),E(v)):ctx.moveTo(X(i),E(v));}); ctx.stroke();
+    axisBox(ctx,x0,y1,w,h1); yticks(Y1,maxC,x0-10,'right',INK);
+    yticks(E,maxE,x0+w+10,'left',S.crime,v=>v>=1000?(v/1000)+'k':String(v));
+    legend(ctx,[{label:'candidate',draw:(c,a,b)=>{c.fillStyle=S.cand;c.fillRect(a-9,b-8,18,16);}},{label:'significant',draw:(c,a,b)=>{c.fillStyle=S.kept;c.fillRect(a-9,b-8,18,16);}},{label:'events',draw:(c,a,b,k)=>line(c,a-k/2,b,a+k/2,b,S.crime,S.lineW)}],x0+12,y1+fs,S,{size:.8});
+    panelTitle(ctx,'a',S.a,0,S.top-16,S);
+    // (b)
+    const maxT=Math.max(...C.threshold)*1.34, Y2=scale(0,maxT,y2+h2,y2);
+    const path=(arr,c,dash)=>{ctx.strokeStyle=c; ctx.lineWidth=S.lineW; ctx.setLineDash(dash||[]); ctx.beginPath(); arr.forEach((v,i)=>{i?ctx.lineTo(X(i),Y2(v)):ctx.moveTo(X(i),Y2(v));}); ctx.stroke(); ctx.setLineDash([]);};
+    path(C.null,S.nullC,[9,6]); path(C.threshold,S.kept);
+    axisBox(ctx,x0,y2,w,h2); yticks(Y2,maxT,x0-10,'right',INK);
+    legend(ctx,[{parts:[['threshold '],['Λ','i'],['*','sup']],draw:(c,a,b,k)=>line(c,a-k/2,b,a+k/2,b,S.kept,S.lineW)},{label:'mean of null maxima',draw:(c,a,b,k)=>line(c,a-k/2,b,a+k/2,b,S.nullC,S.lineW,[9,6])}],x0+12,y2+fs,S,{size:.8});
+    if(ic>=0) text(ctx,C.caveat_label,x0+w-6,y2+h2-10,`italic ${fs*.9}px ${S.font}`,'#8a5a00','right');
+    panelTitle(ctx,'b',S.b,0,y2-16,S);
+    ticks.forEach(([m,i])=>{ line(ctx,X(i),y2+h2,X(i),y2+h2+6,MUTED,1.4); text(ctx,m.slice(0,4),X(i),y2+h2+fs*1.25,`${fs}px ${S.font}`,INK,'center'); });
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Densidad y extracción</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, ramp3, mapFrame, view, polyline, streets, dot, panelTitle, scaleBar} = FigKit;
+const TONOS=['#d7301f','#7b3fa0','#1b9e77','#e89a1c','#2c7fb8','#e7298a','#5c6bc0','#8d6e63'];
+page({
+  key:'figura-densidad', name:'figura_densidad', title:'Densidad y extracción',
+  sub:'Eventos del mes, densidad geodésica sobre la red y subgrafos significativos.',
+  defaults:{W:2000, gap:30, top:56, bottom:14, fontSize:32, streetW:1.6, evR:2.6, evAlpha:.72, fMin:1, fMax:9, hotW:6, gamma:.8,
+    land:'#ececea', street:'#ffffff', frame:'#5b6573', frameW:2, radius:8, font:'Georgia',
+    crime:'#b3131b', fieldBase:'#d4d6d9', c0:'#fdd0a2', c1:'#f16913', c2:'#8c0b0b', bar:500},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:1000,max:3000,step:10}],['gap','Separación','range',{min:0,max:80,step:1}],['bar','Barra de escala (m)','number']]],
+    ['Eventos', true, [['evR','Radio','range',{min:.5,max:6,step:.1}],['evAlpha','Opacidad','range',{min:.1,max:1,step:.02}],['crime','Color','color']]],
+    ['Densidad', true, [['fMin','Grosor mín.','range',{min:.5,max:6,step:.1}],['fMax','Grosor máx.','range',{min:2,max:20,step:.5}],['gamma','Gamma','range',{min:.3,max:2,step:.05}],['fieldBase','Valores bajos','color'],['c0','Rampa 0','color'],['c1','Rampa 1','color'],['c2','Rampa 2','color']]],
+    ['Subgrafos', true, [['hotW','Grosor','range',{min:1,max:16,step:.5}]]],
+    ['Mapa', false, [['streetW','Ancho de calle','range',{min:.5,max:8,step:.25}],['land','Terreno','color'],['street','Calles','color'],['frame','Marco','color'],['frameW','Grosor del marco','range',{min:0,max:5,step:.25}],['radius','Radio del marco','range',{min:0,max:24,step:1}]]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}]]],
+  ],
+  size(S){ const p=(S.W-2*S.gap)/3; return [S.W, Math.round(S.top+p+S.bottom)]; },
+  draw(ctx,S,D){
+    const F=D.field, p=(S.W-2*S.gap)/3, y=S.top;
+    const col=t=>t<.12?S.fieldBase:ramp3(S.c0,S.c1,S.c2,(t-.12)/.88);
+    for(let k=0;k<3;k++){
+      const x=k*(p+S.gap), V=view(x,y,p,p,F.cx,F.cy,F.R);
+      mapFrame(ctx,x,y,p,p,S,()=>{
+        if(k!==1) streets(ctx,V,F.segs,S.street,S.streetW);
+        if(k===0){ ctx.save(); ctx.globalAlpha=S.evAlpha; F.events.forEach(e=>{const q=V(e); dot(ctx,q[0],q[1],S.evR,S.crime);}); ctx.restore(); scaleBar(ctx,V,F.cx,F.cy,F.R,S.bar,S); }
+        if(k===1){
+          ctx.lineCap='round'; ctx.lineJoin='round';
+          F.fe.map((v,i)=>i).sort((a,b)=>F.fe[a]-F.fe[b]).forEach(i=>{
+            const t=Math.pow(F.fe[i],S.gamma); ctx.strokeStyle=col(t); ctx.lineWidth=S.fMin+(S.fMax-S.fMin)*t; polyline(ctx,V,F.segs[i]);});
+        }
+        if(k===2) F.hotspots.forEach((h,i)=>streets(ctx,V,h.segs,TONOS[i%TONOS.length],S.hotW));
+      });
+    }
+    panelTitle(ctx,'a','Events of '+F.month,0,S.top-16,S);
+    panelTitle(ctx,'b',[['Density '],['f','i'],[' ('],['σ','i'],[` = ${F.sigma} m)`]],p+S.gap,S.top-16,S);
+    panelTitle(ctx,'c','Significant subgraphs',2*(p+S.gap),S.top-16,S);
+  },
+});
+</script>
+</body>
+</html>

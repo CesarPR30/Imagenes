@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trayectorias</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, viridis, mapFrame, view, streets, dot, text, rich, panelTitle, scaleBar, INK} = FigKit;
+page({
+  key:'figura-trayectorias', name:'figura_trayectorias', title:'Trayectorias',
+  sub:'Un sitio frecuente y estable frente a uno frecuente y móvil, del primer mes al último.',
+  defaults:{W:1000, gap:18, top:44, bottom:50, barW:150, fontSize:24, streetW:2.4, hotW:4.5, hotA:.55, seedR:5.2, bar:200, infoA:.86,
+    land:'#ececea', street:'#ffffff', frame:'#5b6573', frameW:2, radius:8, font:'Georgia'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['gap','Separación','range',{min:0,max:60,step:1}],['bar','Barra de escala (m)','number']]],
+    ['Trazos', true, [['hotW','Subgrafos','range',{min:1,max:10,step:.25}],['hotA','Opacidad','range',{min:.1,max:1,step:.02}],['seedR','Semillas','range',{min:1,max:12,step:.2}],['infoA','Fondo de la ficha','range',{min:0,max:1,step:.02}]]],
+    ['Mapa', false, [['streetW','Ancho de calle','range',{min:.5,max:8,step:.25}],['land','Terreno','color'],['street','Calles','color'],['frame','Marco','color'],['frameW','Grosor del marco','range',{min:0,max:5,step:.25}],['radius','Radio del marco','range',{min:0,max:24,step:1}]]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}]]],
+  ],
+  size(S){ const p=(S.W-S.gap)/2; return [S.W,Math.round(S.top+p+S.bottom)]; },
+  draw(ctx,S,D){
+    const p=(S.W-S.gap)/2, y=S.top, fs=S.fontSize*.74;
+    D.trajectories.forEach((t,k)=>{
+      const x=k*(p+S.gap), V=view(x,y,p,p,t.cx,t.cy,t.R), n=t.members.length;
+      mapFrame(ctx,x,y,p,p,S,()=>{
+        streets(ctx,V,t.bg,S.street,S.streetW);
+        ctx.save(); ctx.globalAlpha=S.hotA;
+        t.members.forEach((m,j)=>streets(ctx,V,m.segs,viridis(j/Math.max(n-1,1)),S.hotW));
+        ctx.restore();
+        t.members.forEach((m,j)=>{const q=V(m.seed); dot(ctx,q[0],q[1],S.seedR,viridis(j/Math.max(n-1,1)),INK,1);});
+        scaleBar(ctx,V,t.cx,t.cy,t.R,S.bar,S);
+        const lines=[[['k','i'],[` = ${t.k},  ${t.first} – ${t.last}`]],[[`stability ${t.stability.toFixed(2)},  movement ${t.movement} m`]]];
+        ctx.save(); ctx.globalAlpha=S.infoA; ctx.fillStyle='#ffffff'; ctx.fillRect(x,y,p,fs*2.9); ctx.restore();
+        lines.forEach((l,i)=>rich(ctx,l,x+10,y+fs*1.15+i*fs*1.25,S,{size:fs}));
+      });
+      panelTitle(ctx,'ab'[k],t.label,x,S.top-14,S);
+    });
+    const bw=S.barW*2, bx=(S.W-bw)/2, by=y+p+S.bottom*.34, nb=30;
+    for(let i=0;i<nb;i++){ctx.fillStyle=viridis(i/(nb-1)); ctx.fillRect(bx+i*bw/nb,by,bw/nb+.6,S.fontSize*.5);}
+    text(ctx,'first',bx-10,by+S.fontSize*.48,`${fs}px ${S.font}`,INK,'right'); text(ctx,'last',bx+bw+10,by+S.fontSize*.48,`${fs}px ${S.font}`,INK,'left');
+  },
+});
+</script>
+</body>
+</html>

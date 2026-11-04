@@ -20,13 +20,16 @@ a.card:hover{border-color:var(--acc)}
 .card h2{font-size:18px;margin:0 0 4px}
 .card p{color:var(--muted);font-size:13.5px;margin:0 0 12px;font-family:system-ui,sans-serif}
 .card img{width:100%;border-radius:6px;border:1px solid var(--line);background:#fff}
+.two{grid-template-columns:1fr 1fr;margin-bottom:0}.card.wide{grid-column:1/-1}
+h2.sec{font-size:20px;margin:32px 0 12px}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
 .go{color:var(--acc);font-family:system-ui,sans-serif;font-size:13px;font-weight:600}
 </style>
 </head>
 <body>
 <main>
   <h1>Figuras del método Topocrime</h1>
-  <p class="lead">Dos editores para generar las figuras del paper sobre la red vial real de Lima (OpenStreetMap), con delitos simulados y subgrafos calculados con el método. Cada página permite ajustar geometría, colores, ubicación y símbolos, y exporta la figura en PNG o en SVG vectorial.</p>
+  <p class="lead">Editores para generar las figuras del paper sobre la red vial real de Lima (OpenStreetMap), con delitos simulados y subgrafos calculados con el método. Cada página permite ajustar geometría, colores, ubicación y símbolos, y exporta la figura en PNG o en SVG vectorial.</p>
   <div class="grid">
     <a class="card" href="figura-capas.html">
       <h2>De eventos a subgrafo</h2>
@@ -40,6 +43,17 @@ a.card:hover{border-color:var(--acc)}
       <img src="img/figura_temporal.png" alt="Cuatro mapas inclinados en fila con el subgrafo del hotspot en meses sucesivos" loading="lazy">
       <p class="go" style="margin-top:10px">Abrir el editor →</p>
     </a>
+  </div>
+  <h2 class="sec">Modelo de detección (sección 4)</h2>
+  <div class="grid two">
+    <a class="card" href="figura-modelado.html"><h2>Modelado de datos</h2><p>Eventos, enganche a la arista y al nodo, y conteos por nodo.</p><img src="img/figura_modelado.png" alt="Tres mapas: eventos y nodos, trayecto de enganche y conteo por nodo" loading="lazy"></a>
+    <a class="card" href="figura-jointree.html"><h2>Join tree y persistencia</h2><p>Barrido, collados y poda de la rama poco persistente.</p><img src="img/figura_jointree.png" alt="Curva de densidad con cuatro máximos y su árbol de uniones" loading="lazy"></a>
+    <a class="card wide" href="figura-densidad.html"><h2>Densidad y extracción</h2><p>Eventos del mes, densidad geodésica y subgrafos significativos.</p><img src="img/figura_densidad.png" alt="Tres mapas: eventos, densidad sobre calles y subgrafos en colores" loading="lazy"></a>
+    <a class="card" href="figura-seleccion.html"><h2>Selección mensual</h2><p>Candidatas, significativas y umbral de Monte Carlo por mes.</p><img src="img/figura_seleccion.png" alt="Barras de regiones por mes y línea del umbral de significancia" loading="lazy"></a>
+    <a class="card" href="figura-descriptor.html"><h2>Descriptor estructural</h2><p>Un hotspot y sus 18 rasgos sin crimen.</p><img src="img/figura_descriptor.png" alt="Subgrafo con nodos por grado y barras de sus rasgos" loading="lazy"></a>
+    <a class="card" href="figura-embedding.html"><h2>Espacio de embedding</h2><p>Proyección, grupos y vecinos estructurales de un hotspot.</p><img src="img/figura_embedding.png" alt="Nube de puntos por grupo con una consulta y sus cinco vecinos" loading="lazy"></a>
+    <a class="card" href="figura-trayectorias.html"><h2>Trayectorias</h2><p>Un sitio estable frente a uno móvil, del primer mes al último.</p><img src="img/figura_trayectorias.png" alt="Dos mapas con los subgrafos de cada mes coloreados por tiempo" loading="lazy"></a>
+    <a class="card wide" href="figura-validacion.html"><h2>Validación sintética</h2><p>Detección frente a una verdad conocida y sensibilidad a los parámetros.</p><img src="img/figura_validacion.png" alt="Barras de PPV, sensibilidad y F1, y curvas de F1 según sigma y f mínimo" loading="lazy"></a>
   </div>
 </main>
 </body>

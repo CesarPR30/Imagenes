@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espacio de embedding</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, rrect, dot, star, line, text, scale, INK} = FigKit;
+const PAL=['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#17becf','#bcbd22','#7f7f7f','#aec7e8','#ffbb78','#98df8a','#ff9896','#c5b0d5','#c49c94'];
+page({
+  key:'figura-embedding', name:'figura_embedding', title:'Espacio de embedding',
+  sub:'Proyección de los vectores fusionados, grupos y los vecinos estructurales de un hotspot.',
+  defaults:{W:1000, H:760, top:48, pad:14, fontSize:24, ptR:2.4, ptA:.85, inset:true, insetPos:'auto', insetW:.35, insetM:.82, starR:16, neighR:6.5, lineW:1.8,
+    font:'Georgia', frame:'#5b6573', query:'#b3131b', noise:'#d5d8db'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['H','Alto','range',{min:420,max:1400,step:10}]]],
+    ['Puntos', true, [['ptR','Radio','range',{min:.6,max:6,step:.1}],['ptA','Opacidad','range',{min:.2,max:1,step:.02}],['starR','Consulta','range',{min:6,max:30,step:1}],['neighR','Vecinos','range',{min:2,max:14,step:.5}],['lineW','Enlaces','range',{min:.5,max:5,step:.1}],['query','Color consulta','color']]],
+    ['Recuadro', true, [['inset','Mostrar','check'],['insetPos','Esquina','select',[['auto','Automática'],['bl','Abajo izquierda'],['br','Abajo derecha'],['tl','Arriba izquierda'],['tr','Arriba derecha']]],['insetW','Tamaño','range',{min:.2,max:.6,step:.01}],['insetM','Margen de zoom','range',{min:.4,max:2,step:.02}]]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}]]],
+  ],
+  size:S=>[S.W,S.H],
+  draw(ctx,S,D){
+    const E=D.embedding, fs=S.fontSize*.82, x=S.pad, y=S.top, w=S.W-2*S.pad, h=S.H-S.top-S.pad;
+    const mm=a=>[Math.min(...a),Math.max(...a)], [x0,x1]=mm(E.x), [y0,y1]=mm(E.y), m=.05*(x1-x0), n=.05*(y1-y0);
+    const X=scale(x0-m,x1+m,x,x+w), Y=scale(y0-n,y1+n,y+h,y), clusters=[...new Set(E.c.filter(c=>c>=0))].sort((a,b)=>a-b);
+    const color=c=>c<0?S.noise:PAL[clusters.indexOf(c)%PAL.length];
+    const plot=(PX,PY,r)=>{ ctx.save(); ctx.globalAlpha=S.ptA; E.x.forEach((v,i)=>dot(ctx,PX(v),PY(E.y[i]),r,color(E.c[i]))); ctx.restore(); };
+    const links=(PX,PY)=>{ const qx=PX(E.x[E.query]), qy=PY(E.y[E.query]);
+      E.neigh.forEach(j=>line(ctx,qx,qy,PX(E.x[j]),PY(E.y[j]),INK,S.lineW));
+      E.neigh.forEach(j=>dot(ctx,PX(E.x[j]),PY(E.y[j]),S.neighR,'#ffffff',INK,1.8));
+      star(ctx,qx,qy,S.starR,S.query,INK,1.2); };
+    rrect(ctx,x,y,w,h,8); ctx.strokeStyle=S.frame; ctx.lineWidth=2; ctx.stroke();
+    plot(X,Y,S.ptR); links(X,Y);
+    const group=E.clustering==='louvain'?'Louvain':E.clustering;
+    text(ctx,`${E.n.toLocaleString('en-US')} subgraphs · ${E.n_clusters} ${group} groups`,0,S.top-16,`600 ${S.fontSize}px ${S.font}`,INK);
+    if(S.inset){
+      const iw=w*S.insetW, ih=iw*.86, gr=[E.query,...E.neigh], gx=gr.map(i=>E.x[i]), gy=gr.map(i=>E.y[i]);
+      const box=p=>[p[1]==='l'?x+14:x+w-iw-14, p[0]==='b'?y+h-ih-14:y+14], inside=(px,py,[bx,by])=>px>=bx&&px<=bx+iw&&py>=by&&py<=by+ih;
+      // Automática: la esquina que tapa menos puntos y no contiene la consulta.
+      const load=p=>{ const b=box(p); return (inside(X(E.x[E.query]),Y(E.y[E.query]),b)?1e9:0)+E.x.filter((v,i)=>inside(X(v),Y(E.y[i]),b)).length; };
+      const pos=S.insetPos==='auto'?['bl','br','tl','tr'].reduce((a,p)=>load(p)<load(a)?p:a):S.insetPos, [ix,iy]=box(pos);
+      const [a0,a1]=mm(gx), [b0,b1]=mm(gy), cx=(a0+a1)/2, cy=(b0+b1)/2, r=Math.max(a1-a0,b1-b0,.3)*S.insetM;
+      const IX=scale(cx-r,cx+r,ix,ix+iw), IY=scale(cy-r*ih/iw,cy+r*ih/iw,iy+ih,iy);
+      ctx.strokeStyle=S.frame; ctx.lineWidth=1.4; ctx.strokeRect(X(cx-r),Y(cy+r*ih/iw),X(cx+r)-X(cx-r),Y(cy-r*ih/iw)-Y(cy+r*ih/iw));
+      ctx.save(); rrect(ctx,ix,iy,iw,ih,7); ctx.fillStyle='#ffffff'; ctx.fill(); ctx.clip(); plot(IX,IY,S.ptR*1.3); links(IX,IY); ctx.restore();
+      rrect(ctx,ix,iy,iw,ih,7); ctx.strokeStyle=S.frame; ctx.lineWidth=2; ctx.stroke();
+      text(ctx,E.query_id,ix+10,iy+fs*1.25,`${fs}px ${S.font}`,INK);
+    }
+  },
+});
+</script>
+</body>
+</html>

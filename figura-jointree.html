@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join tree y persistencia</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, dot, square, line, text, rich, panelTitle, scale, axisBox, legend} = FigKit;
+page({
+  key:'figura-jointree', name:'figura_jointree', title:'Join tree y persistencia',
+  sub:'Barrido descendente, collados y simplificación por persistencia sobre una función de ejemplo.',
+  defaults:{W:1000, H:470, split:.62, gap:34, top:46, bottom:40, left:34, fontSize:24, curveW:3.4, fillA:.24, mR:6, sS:5, treeW:5,
+    font:'Georgia', ink:'#1f2328', muted:'#5b6573', r0:'#d7301f', r1:'#1b9e77', r2:'#2c7fb8', a:'Sweep, saddles and persistence', b:'Join tree'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['H','Alto','range',{min:300,max:900,step:10}],['split','Reparto (a/b)','range',{min:.45,max:.75,step:.01}],['gap','Separación','range',{min:0,max:80,step:1}]]],
+    ['Trazos', true, [['curveW','Curva','range',{min:1,max:8,step:.2}],['fillA','Relleno','range',{min:0,max:.6,step:.02}],['mR','Máximos','range',{min:2,max:12,step:.5}],['sS','Collados','range',{min:2,max:10,step:.5}],['treeW','Ramas','range',{min:1,max:10,step:.5}]]],
+    ['Colores', false, [['r0','Región 1','color'],['r1','Región 2','color'],['r2','Región 3','color'],['muted','Secundario','color']]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}],['a','Panel a','text'],['b','Panel b','text']]],
+  ],
+  size:S=>[S.W,S.H],
+  draw(ctx,S,D){
+    const J=D.jointree, colors=[S.r0,S.r1,S.r2], fm=S.fontSize*.9;
+    const w=S.W*S.split-S.left, h=S.H-S.top-S.bottom, x0=S.left, y0=S.top;
+    const top=Math.max(...J.f)*1.14, X=scale(0,10,x0,x0+w-44), Y=scale(0,top,y0+h,y0);
+    axisBox(ctx,x0,y0,w-44,h);
+    // regiones por encima de f_min
+    for(let k=0;k<colors.length;k++){
+      let open=false, last=null;
+      ctx.beginPath();
+      J.x.forEach((v,i)=>{ const inn=J.region[i]===k && J.f[i]>=J.fmin;
+        if(inn){ if(!open){ctx.moveTo(X(v),Y(0)); open=true;} ctx.lineTo(X(v),Y(J.f[i])); last=v; }
+        else if(open){ ctx.lineTo(X(last),Y(0)); ctx.closePath(); open=false; }});
+      if(open){ ctx.lineTo(X(last),Y(0)); ctx.closePath(); }
+      ctx.save(); ctx.globalAlpha=S.fillA; ctx.fillStyle=colors[k]; ctx.fill(); ctx.restore();
+    }
+    line(ctx,x0,Y(J.fmin),x0+w-44,Y(J.fmin),S.muted,1.6,[3,5]);
+    rich(ctx,[['f','i'],['min','sub']],x0+w-40,Y(J.fmin)+6,S,{size:fm,color:S.muted});
+    ctx.strokeStyle=S.ink; ctx.lineWidth=S.curveW; ctx.lineJoin='round'; ctx.beginPath();
+    J.x.forEach((v,i)=>{ i?ctx.lineTo(X(v),Y(J.f[i])):ctx.moveTo(X(v),Y(J.f[i])); }); ctx.stroke();
+    J.saddles.forEach(i=>square(ctx,X(J.x[i]),Y(J.f[i]),S.sS,S.muted));
+    J.maxima.forEach((i,j)=>{ dot(ctx,X(J.x[i]),Y(J.f[i]),S.mR,S.ink); rich(ctx,[['m','i'],[String(j+1),'sub']],X(J.x[i]),Y(J.f[i])-14,S,{size:fm,align:'center'}); });
+    // persistencia de la rama podada
+    const P=J.branches.find(b=>b.pruned), m=J.maxima[P.m], sx=J.saddles.find(i=>Math.abs(J.f[i]-P.end)<1e-3);
+    const ax=X(J.x[sx]), yt=Y(J.f[m]), yb=Y(P.end);
+    line(ctx,X(J.x[m]),yt,ax,yt,S.ink,1.2,[3,4]); line(ctx,ax,yt,ax,yb,S.ink,1.8);
+    for(const [yy,d] of [[yt,1],[yb,-1]]){ ctx.fillStyle=S.ink; ctx.beginPath(); ctx.moveTo(ax,yy); ctx.lineTo(ax-5,yy+d*9); ctx.lineTo(ax+5,yy+d*9); ctx.closePath(); ctx.fill(); }
+    const pl=[['π','i'],['('],['m','i'],[String(P.m+1),'sub'],[') < '],['τ','i']], lx=X(J.x[m]), ly=yt-fm*2.3;
+    ctx.save(); ctx.globalAlpha=.9; ctx.fillStyle='#ffffff'; ctx.fillRect(lx-fm*2.3,ly-fm*.85,fm*4.6,fm*1.2); ctx.restore();
+    rich(ctx,pl,lx,ly,S,{size:fm,align:'center'});
+    text(ctx,'position along the street network',x0+(w-44)/2,S.H-10,`${fm}px ${S.font}`,S.muted,'center');
+    ctx.save(); ctx.translate(14,y0+h/2); ctx.rotate(-Math.PI/2); rich(ctx,[['density '],['f','i'],['('],['v','i'],[')']],0,0,S,{size:fm,color:S.muted,align:'center'}); ctx.restore();
+    panelTitle(ctx,'a',S.a,0,S.top-16,S);
+    // join tree
+    const tx=S.W*S.split+S.gap, tw=S.W-tx-10, n=J.maxima.length, xs=j=>tx+tw*(.1+.8*j/(n-1));
+    const kept=J.branches.filter(b=>!b.pruned).map(b=>b.m);
+    J.branches.forEach(b=>{ const yT=Y(J.f[J.maxima[b.m]]), yB=Y(b.end), c=b.pruned?'#aeb4ba':colors[kept.indexOf(b.m)%3];
+      if(b.into!==null) line(ctx,xs(b.m),yB,xs(b.into),yB,S.muted,1.8);
+      line(ctx,xs(b.m),yT,xs(b.m),yB,c,b.pruned?S.treeW*.55:S.treeW,b.pruned?[8,6]:[]);
+      if(b.into!==null) square(ctx,xs(b.m),yB,S.sS,S.muted);
+      dot(ctx,xs(b.m),yT,S.mR,S.ink); rich(ctx,[['m','i'],[String(b.m+1),'sub']],xs(b.m),yT-14,S,{size:fm,align:'center'}); });
+    legend(ctx,[{label:'pruned',draw:(c,a,b,k)=>line(c,a-k/2,b,a+k/2,b,'#aeb4ba',3,[8,6])}],tx,S.H-10,S,{size:.8});
+    panelTitle(ctx,'b',S.b,tx,S.top-16,S);
+  },
+});
+</script>
+</body>
+</html>
