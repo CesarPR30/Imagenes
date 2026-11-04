@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelado de datos</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, ramp3, mapFrame, view, streets, dot, line, text, panelTitle, scaleBar, legend, INK} = FigKit;
+page({
+  key:'figura-modelado', name:'figura_modelado', title:'Modelado de datos',
+  sub:'De los eventos a los conteos por nodo: arista más cercana y luego su extremo más cercano.',
+  defaults:{W:1000, gap:18, top:42, bottom:52, fontSize:22, streetW:3, nodeR:3.6, evR:3.8, lineW:1.4, cMin:4, cMax:15,
+    land:'#ececea', street:'#ffffff', frame:'#5b6573', frameW:2, radius:8, font:'Georgia',
+    crime:'#b3131b', nodeColor:'#5b6573', c0:'#fdd0a2', c1:'#f16913', c2:'#8c0b0b', bar:100,
+    a:'Events and street nodes', b:'Edge first, node second'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['gap','Separación','range',{min:0,max:60,step:1}],['bar','Barra de escala (m)','number']]],
+    ['Símbolos', true, [['nodeR','Radio de nodo','range',{min:1,max:8,step:.2}],['evR','Radio de evento','range',{min:1,max:8,step:.2}],['lineW','Enganche','range',{min:.3,max:4,step:.1}],['cMin','Conteo: radio mín.','range',{min:2,max:12,step:.5}],['cMax','Conteo: radio máx.','range',{min:6,max:30,step:.5}]]],
+    ['Colores', false, [['crime','Eventos','color'],['nodeColor','Nodos','color'],['c0','Rampa 0','color'],['c1','Rampa 1','color'],['c2','Rampa 2','color']]],
+    ['Mapa', false, [['streetW','Ancho de calle','range',{min:.5,max:8,step:.25}],['land','Terreno','color'],['street','Calles','color'],['frame','Marco','color'],['frameW','Grosor del marco','range',{min:0,max:5,step:.25}],['radius','Radio del marco','range',{min:0,max:24,step:1}]]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}],['a','Panel a','text'],['b','Panel b','text']]],
+  ],
+  size(S){ const p=(S.W-2*S.gap)/3; return [S.W, Math.round(S.top+p+S.bottom)]; },
+  draw(ctx,S,D){
+    const M=D.modelling, p=(S.W-2*S.gap)/3, y=S.top, target=M.target;
+    const cnt=new Array(M.nodes.length).fill(0); target.forEach(i=>cnt[i]++);
+    const max=Math.max(1,...cnt), tiny=S.fontSize*.74;
+    for(let k=0;k<3;k++){
+      const x=k*(p+S.gap), V=view(x,y,p,p,M.cx,M.cy,M.R);
+      mapFrame(ctx,x,y,p,p,S,()=>{
+        streets(ctx,V,M.segs,S.street,S.streetW);
+        if(k<2) M.nodes.forEach(n=>{const q=V(n); dot(ctx,q[0],q[1],S.nodeR,S.nodeColor);});
+        if(k===0) M.events.forEach(e=>{const q=V(e); dot(ctx,q[0],q[1],S.evR,S.crime,'#ffffff',.6);});
+        if(k===1){
+          M.events.forEach((e,i)=>{const a=V(e),b=V(M.foot[i]),c=V(M.nodes[target[i]]);
+            ctx.strokeStyle=S.crime; ctx.lineWidth=S.lineW; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.lineTo(c[0],c[1]); ctx.stroke();});
+          M.events.forEach(e=>{const q=V(e); dot(ctx,q[0],q[1],S.evR*.8,S.crime);});
+        }
+        if(k===2){
+          M.nodes.forEach((n,i)=>{ if(!cnt[i]){const q=V(n); dot(ctx,q[0],q[1],S.nodeR*.75,'#aeb4ba');} });
+          M.nodes.map((n,i)=>i).filter(i=>cnt[i]).sort((a,b)=>cnt[b]-cnt[a]).forEach(i=>{
+            const q=V(M.nodes[i]), t=Math.sqrt(cnt[i]/max);
+            dot(ctx,q[0],q[1],S.cMin+(S.cMax-S.cMin)*t,ramp3(S.c0,S.c1,S.c2,cnt[i]/max),INK,.8);});
+        }
+        if(k===0) scaleBar(ctx,V,M.cx,M.cy,M.R,S.bar,S);
+      });
+    }
+    panelTitle(ctx,'a',S.a,0,S.top-14,S); panelTitle(ctx,'b',S.b,p+S.gap,S.top-14,S);
+    panelTitle(ctx,'c',[['Counts '],['c','i'],['m','subi'],['('],['v','i'],[') per node']],2*(p+S.gap),S.top-14,S);
+    const ly=y+p+S.bottom*.68;
+    legend(ctx,[
+      {label:'event',draw:(c,a,b)=>dot(c,a,b,S.evR+1,S.crime)},
+      {label:'street node',draw:(c,a,b)=>dot(c,a,b,S.nodeR+1,S.nodeColor)},
+      {label:'snapping path',draw:(c,a,b,k)=>line(c,a-k/2,b,a+k/2,b,S.crime,S.lineW+1)},
+    ],0,ly,S,{size:.82});
+    const bw=130, bx=S.W-bw-92, by=ly-S.fontSize*.56, n=24;
+    for(let i=0;i<n;i++){ctx.fillStyle=ramp3(S.c0,S.c1,S.c2,i/(n-1)); ctx.fillRect(bx+i*bw/n,by,bw/n+.6,S.fontSize*.5);}
+    text(ctx,'1',bx-8,ly,`${tiny}px ${S.font}`,INK,'right'); text(ctx,max+' events',bx+bw+8,ly,`${tiny}px ${S.font}`,INK,'left');
+  },
+});
+</script>
+</body>
+</html>

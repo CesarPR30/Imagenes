@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Descriptor estructural</title>
+</head>
+<body>
+<script src="svgctx.js"></script>
+<script src="figkit.js"></script>
+<script>
+"use strict";
+const {page, view, streets, dot, text, panelTitle, legend, INK} = FigKit;
+page({
+  key:'figura-descriptor', name:'figura_descriptor', title:'Descriptor estructural',
+  sub:'Un hotspot y su huella sin crimen: 12 rasgos estructurales y 6 de jerarquía vial.',
+  defaults:{W:1000, H:560, split:.36, top:46, labelW:232, fontSize:24, edgeW:3.4, nodeR:6, barH:.7, pad:.08,
+    font:'Georgia', edge:'#1f2328', d1:'#e89a1c', d2:'#9aa3ab', d3:'#3cbaec', d4:'#0b5e86', conn:'#3cbaec', geom:'#0b5e86', hier:'#e89a1c'},
+  schema:()=>[
+    ['Lámina', true, [['W','Ancho','range',{min:700,max:2000,step:10}],['H','Alto','range',{min:380,max:1000,step:10}],['split','Reparto (a/b)','range',{min:.25,max:.5,step:.01}],['labelW','Ancho de rótulos','range',{min:120,max:360,step:2}],['barH','Alto de barra','range',{min:.3,max:1,step:.02}]]],
+    ['Subgrafo', true, [['edgeW','Aristas','range',{min:1,max:8,step:.2}],['nodeR','Nodos','range',{min:2,max:12,step:.5}],['edge','Color arista','color'],['d1','Grado 1','color'],['d2','Grado 2','color'],['d3','Grado 3','color'],['d4','Grado 4+','color']]],
+    ['Bloques', false, [['conn','Conectividad','color'],['geom','Geometría','color'],['hier','Jerarquía','color']]],
+    ['Texto', false, [['font','Tipografía','select',[['Georgia','Georgia'],['Times New Roman','Times'],['Arial','Arial']]],['fontSize','Tamaño','range',{min:12,max:48,step:1}]]],
+  ],
+  size:S=>[S.W,S.H],
+  draw(ctx,S,D){
+    const G=D.descriptor, fs=S.fontSize*.78, mw=S.W*S.split, y0=S.top, mh=S.H-S.top-S.fontSize*3;
+    const all=G.segs.flat(), xs=all.map(p=>p[0]), ys=all.map(p=>p[1]);
+    const x1=Math.min(...xs),x2=Math.max(...xs),y1=Math.min(...ys),y2=Math.max(...ys), R=Math.max(x2-x1,y2-y1)/2*(1+S.pad);
+    const V=view(0,y0,mw-16,mh,(x1+x2)/2,(y1+y2)/2,R);
+    streets(ctx,V,G.segs,S.edge,S.edgeW);
+    const dc={1:S.d1,2:S.d2,3:S.d3,4:S.d4};
+    G.nodes.forEach(n=>{const q=V(n); dot(ctx,q[0],q[1],S.nodeR,dc[Math.min(n[2],4)]||S.d2,'#ffffff',1);});
+    legend(ctx,[1,2,3,4].map(d=>({label:'deg. '+d+(d===4?'+':''),draw:(c,a,b)=>dot(c,a,b,S.nodeR,dc[d],'#ffffff',1)})),0,S.H-S.fontSize*1.5,S,{size:.76,maxW:mw-20,gap:12,key:16});
+    panelTitle(ctx,'a',G.id,0,S.top-16,S);
+    const bx=mw+S.labelW, bw=S.W-bx-8, F=G.features, h=(S.H-S.top-S.fontSize*2.6)/F.length, col={connectivity:S.conn,geometry:S.geom,hierarchy:S.hier};
+    F.forEach((f,i)=>{ const y=S.top+i*h;
+      ctx.fillStyle='#eff0f2'; ctx.fillRect(bx,y+h*(1-S.barH)/2,bw,h*S.barH);
+      ctx.fillStyle=col[f.block]; ctx.fillRect(bx,y+h*(1-S.barH)/2,bw*Math.max(0,Math.min(1,f.value)),h*S.barH);
+      text(ctx,f.name,bx-10,y+h/2+fs*.34,`${fs}px ${S.font}`,INK,'right'); });
+    const box=c=>(z,a,b)=>{z.fillStyle=c;z.fillRect(a-9,b-8,18,16);};
+    legend(ctx,[{label:'connectivity (8)',draw:box(S.conn)},{label:'geometry (4)',draw:box(S.geom)},{label:'hierarchy (6)',draw:box(S.hier)}],mw,S.H-S.fontSize*.5,S,{size:.76,gap:12,key:16});
+    panelTitle(ctx,'b','Crime-free fingerprint',mw,S.top-16,S);
+  },
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2000" height="640" viewBox="0 0 2000 640">
+<defs></defs>
+<rect x="0" y="0" width="2000" height="640" fill="#ffffff"/>
+<path d="M64 56L64 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<path d="M64 516L725.54 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<path d="M58 516L64 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="53" y="525.14" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0</text>
+<path d="M58 405.42L64 405.42" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="53" y="414.56" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.25</text>
+<path d="M58 294.85L64 294.85" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="53" y="303.99" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.5</text>
+<path d="M58 184.27L64 184.27" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="53" y="193.41" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.75</text>
+<path d="M58 73.69L64 73.69" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="53" y="82.83" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">1</text>
+<rect x="84.95" y="220.49" width="55.97" height="295.51" fill="#1f2328"/>
+<path d="M112.93 249.6L112.93 191.39" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M106.93 249.6L118.93 249.6" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M106.93 191.39L118.93 191.39" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="144.49" y="337.13" width="55.97" height="178.87" fill="#e89a1c"/>
+<path d="M172.47 362.74L172.47 311.52" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M166.47 362.74L178.47 362.74" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M166.47 311.52L178.47 311.52" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="204.03" y="364.55" width="55.97" height="151.45" fill="#9aa3ab"/>
+<path d="M232.01 388.48L232.01 340.63" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M226.01 388.48L238.01 388.48" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M226.01 340.63L238.01 340.63" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<text x="148.91" y="550.94" style="font:26.88px Georgia" text-anchor="start" fill="#1f2328">PPV</text>
+<rect x="305.46" y="130.79" width="55.97" height="385.21" fill="#1f2328"/>
+<path d="M333.44 148.8L333.44 112.79" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M327.44 148.8L339.44 148.8" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M327.44 112.79L339.44 112.79" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="365" y="200.28" width="55.97" height="315.72" fill="#e89a1c"/>
+<path d="M392.98 222.26L392.98 178.3" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M386.98 222.26L398.98 222.26" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M386.98 178.3L398.98 178.3" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="424.54" y="229.56" width="55.97" height="286.44" fill="#9aa3ab"/>
+<path d="M452.52 257.74L452.52 201.39" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M446.52 257.74L458.52 257.74" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M446.52 201.39L458.52 201.39" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<text x="332.6" y="550.94" style="font:26.88px Georgia" text-anchor="start" fill="#1f2328">Sensitivity</text>
+<rect x="525.97" y="182.41" width="55.97" height="333.59" fill="#1f2328"/>
+<path d="M553.96 201.56L553.96 163.26" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M547.96 201.56L559.96 201.56" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M547.96 163.26L559.96 163.26" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="585.51" y="289.01" width="55.97" height="226.99" fill="#e89a1c"/>
+<path d="M613.5 310.33L613.5 267.69" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M607.5 310.33L619.5 310.33" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M607.5 267.69L619.5 267.69" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<rect x="645.05" y="319.26" width="55.97" height="196.74" fill="#9aa3ab"/>
+<path d="M673.03 340.85L673.03 297.68" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M667.03 340.85L679.03 340.85" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<path d="M667.03 297.68L679.03 297.68" fill="none" stroke="#6b747c" stroke-width="1.8"/>
+<text x="603.3" y="550.94" style="font:italic 26.88px Georgia" text-anchor="start" fill="#1f2328">F</text>
+<text x="619.41" y="557.4" style="font:18.2784px Georgia" text-anchor="start" fill="#1f2328">1</text>
+<text x="0" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328">(a) </text>
+<text x="55.78" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328">Calibrated regime</text>
+<path d="M815.54 56L815.54 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<path d="M815.54 516L1344.77 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<path d="M809.54 516L815.54 516" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="804.54" y="525.14" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0</text>
+<path d="M809.54 405.42L815.54 405.42" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="804.54" y="414.56" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.25</text>
+<path d="M809.54 294.85L815.54 294.85" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="804.54" y="303.99" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.5</text>
+<path d="M809.54 184.27L815.54 184.27" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="804.54" y="193.41" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.75</text>
+<path d="M809.54 73.69L815.54 73.69" fill="none" stroke="#5b6573" stroke-width="1.4"/>
+<text x="804.54" y="82.83" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">1</text>
+<path d="M1131.48 56L1131.48 516" fill="none" stroke="#b3131b" stroke-width="2.4"/>
+<path d="M823.54 98.73L926.18 139.2L1028.83 167.33L1131.48 214.83L1336.77 320.59" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="3 6"/>
+<path d="M823.54 194L926.18 158.04L1028.83 154.19L1131.48 132.43L1336.77 104.57" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="12 7"/>
+<path d="M823.54 269.72L926.18 287.33L1028.83 298.38L1131.48 317.58L1336.77 349.87" fill="none" stroke="#9aa3ab" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M828.54 269.72A5 5 0 1 1 818.54 269.72A5 5 0 1 1 828.54 269.72" fill="#9aa3ab"/>
+<path d="M931.18 287.33A5 5 0 1 1 921.18 287.33A5 5 0 1 1 931.18 287.33" fill="#9aa3ab"/>
+<path d="M1033.83 298.38A5 5 0 1 1 1023.83 298.38A5 5 0 1 1 1033.83 298.38" fill="#9aa3ab"/>
+<path d="M1136.48 317.58A5 5 0 1 1 1126.48 317.58A5 5 0 1 1 1136.48 317.58" fill="#9aa3ab"/>
+<path d="M1341.77 349.87A5 5 0 1 1 1331.77 349.87A5 5 0 1 1 1341.77 349.87" fill="#9aa3ab"/>
+<path d="M823.54 240.62L926.18 256.19L1028.83 263.66L1131.48 290.78L1336.77 340.85" fill="none" stroke="#e89a1c" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M828.54 240.62A5 5 0 1 1 818.54 240.62A5 5 0 1 1 828.54 240.62" fill="#e89a1c"/>
+<path d="M931.18 256.19A5 5 0 1 1 921.18 256.19A5 5 0 1 1 931.18 256.19" fill="#e89a1c"/>
+<path d="M1033.83 263.66A5 5 0 1 1 1023.83 263.66A5 5 0 1 1 1033.83 263.66" fill="#e89a1c"/>
+<path d="M1136.48 290.78A5 5 0 1 1 1126.48 290.78A5 5 0 1 1 1136.48 290.78" fill="#e89a1c"/>
+<path d="M1341.77 340.85A5 5 0 1 1 1331.77 340.85A5 5 0 1 1 1341.77 340.85" fill="#e89a1c"/>
+<path d="M823.54 153.04L926.18 149.28L1028.83 161.84L1131.48 180.07L1336.77 252.92" fill="none" stroke="#1f2328" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M828.54 153.04A5 5 0 1 1 818.54 153.04A5 5 0 1 1 828.54 153.04" fill="#1f2328"/>
+<path d="M931.18 149.28A5 5 0 1 1 921.18 149.28A5 5 0 1 1 931.18 149.28" fill="#1f2328"/>
+<path d="M1033.83 161.84A5 5 0 1 1 1023.83 161.84A5 5 0 1 1 1033.83 161.84" fill="#1f2328"/>
+<path d="M1136.48 180.07A5 5 0 1 1 1126.48 180.07A5 5 0 1 1 1136.48 180.07" fill="#1f2328"/>
+<path d="M1341.77 252.92A5 5 0 1 1 1331.77 252.92A5 5 0 1 1 1341.77 252.92" fill="#1f2328"/>
+<path d="M823.54 516L823.54 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="823.54" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">30</text>
+<path d="M926.18 516L926.18 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="926.18" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">60</text>
+<path d="M1028.83 516L1028.83 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1028.83" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">90</text>
+<path d="M1131.48 516L1131.48 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1131.48" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">120</text>
+<path d="M1336.77 516L1336.77 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1336.77" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">180</text>
+<text x="1047.34" y="584.54" style="font:italic 26.88px Georgia" text-anchor="start" fill="#5b6573">σ</text>
+<text x="1062.65" y="584.54" style="font:26.88px Georgia" text-anchor="start" fill="#5b6573"> (m)</text>
+<text x="777.14" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328">(b) </text>
+<text x="834.51" y="38" style="font:italic 600 32px Georgia" text-anchor="start" fill="#1f2328">F</text>
+<text x="856" y="45.68" style="font:600 21.76px Georgia" text-anchor="start" fill="#1f2328">1</text>
+<text x="866.65" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328"> vs </text>
+<text x="917.45" y="38" style="font:italic 600 32px Georgia" text-anchor="start" fill="#1f2328">σ</text>
+<path d="M1434.77 56L1434.77 516" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<path d="M1434.77 516L1964 516" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<path d="M1428.77 516L1434.77 516" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1423.77" y="525.14" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0</text>
+<path d="M1428.77 405.42L1434.77 405.42" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1423.77" y="414.56" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.25</text>
+<path d="M1428.77 294.85L1434.77 294.85" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1423.77" y="303.99" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.5</text>
+<path d="M1428.77 184.27L1434.77 184.27" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1423.77" y="193.41" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">0.75</text>
+<path d="M1428.77 73.69L1434.77 73.69" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1423.77" y="82.83" style="font:26.88px Georgia" text-anchor="end" fill="#1f2328">1</text>
+<path d="M1516.09 56L1516.09 516" fill="none" stroke="#b3131b" stroke-width="2.4" stroke-linejoin="round"/>
+<path d="M1442.77 328.06L1516.09 214.83L1662.73 140.97L1956 86.61" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="3 6"/>
+<path d="M1442.77 91.21L1516.09 132.43L1662.73 246.86L1956 411.62" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="12 7"/>
+<path d="M1442.77 356.73L1516.09 317.58L1662.73 304.09L1956 364.64" fill="none" stroke="#9aa3ab" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M1447.77 356.73A5 5 0 1 1 1437.77 356.73A5 5 0 1 1 1447.77 356.73" fill="#9aa3ab"/>
+<path d="M1521.09 317.58A5 5 0 1 1 1511.09 317.58A5 5 0 1 1 1521.09 317.58" fill="#9aa3ab"/>
+<path d="M1667.73 304.09A5 5 0 1 1 1657.73 304.09A5 5 0 1 1 1667.73 304.09" fill="#9aa3ab"/>
+<path d="M1961 364.64A5 5 0 1 1 1951 364.64A5 5 0 1 1 1961 364.64" fill="#9aa3ab"/>
+<path d="M1442.77 350.27L1516.09 290.78L1662.73 277.24L1956 344.43" fill="none" stroke="#e89a1c" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M1447.77 350.27A5 5 0 1 1 1437.77 350.27A5 5 0 1 1 1447.77 350.27" fill="#e89a1c"/>
+<path d="M1521.09 290.78A5 5 0 1 1 1511.09 290.78A5 5 0 1 1 1521.09 290.78" fill="#e89a1c"/>
+<path d="M1667.73 277.24A5 5 0 1 1 1657.73 277.24A5 5 0 1 1 1667.73 277.24" fill="#e89a1c"/>
+<path d="M1961 344.43A5 5 0 1 1 1951 344.43A5 5 0 1 1 1961 344.43" fill="#e89a1c"/>
+<path d="M1442.77 258.4L1516.09 180.07L1662.73 206.65L1956 350.67" fill="none" stroke="#1f2328" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M1447.77 258.4A5 5 0 1 1 1437.77 258.4A5 5 0 1 1 1447.77 258.4" fill="#1f2328"/>
+<path d="M1521.09 180.07A5 5 0 1 1 1511.09 180.07A5 5 0 1 1 1521.09 180.07" fill="#1f2328"/>
+<path d="M1667.73 206.65A5 5 0 1 1 1657.73 206.65A5 5 0 1 1 1667.73 206.65" fill="#1f2328"/>
+<path d="M1961 350.67A5 5 0 1 1 1951 350.67A5 5 0 1 1 1961 350.67" fill="#1f2328"/>
+<path d="M1442.77 516L1442.77 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1442.77" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">0.05</text>
+<path d="M1516.09 516L1516.09 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1516.09" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">0.1</text>
+<path d="M1662.73 516L1662.73 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1662.73" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">0.2</text>
+<path d="M1956 516L1956 522" fill="none" stroke="#5b6573" stroke-width="1.4" stroke-linejoin="round"/>
+<text x="1956" y="550.94" style="font:26.88px Georgia" text-anchor="middle" fill="#1f2328">0.4</text>
+<text x="1647.51" y="584.54" style="font:italic 26.88px Georgia" text-anchor="start" fill="#5b6573">f</text>
+<text x="1656.34" y="591" style="font:18.2784px Georgia" text-anchor="start" fill="#5b6573">min</text>
+<text x="1688.58" y="584.54" style="font:26.88px Georgia" text-anchor="start" fill="#5b6573"> ratio</text>
+<text x="1396.37" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328">(c) </text>
+<text x="1450.09" y="38" style="font:italic 600 32px Georgia" text-anchor="start" fill="#1f2328">F</text>
+<text x="1471.57" y="45.68" style="font:600 21.76px Georgia" text-anchor="start" fill="#1f2328">1</text>
+<text x="1482.23" y="38" style="font:600 32px Georgia" text-anchor="start" fill="#1f2328"> vs </text>
+<text x="1533.03" y="38" style="font:italic 600 32px Georgia" text-anchor="start" fill="#1f2328">f</text>
+<text x="1545.21" y="45.68" style="font:600 21.76px Georgia" text-anchor="start" fill="#1f2328">min</text>
+<path d="M64 617.6L112 617.6" fill="none" stroke="#1f2328" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M93 617.6A5 5 0 1 1 83 617.6A5 5 0 1 1 93 617.6" fill="#1f2328"/>
+<text x="118" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">Topological</text>
+<path d="M282.86 617.6L330.86 617.6" fill="none" stroke="#e89a1c" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M311.86 617.6A5 5 0 1 1 301.86 617.6A5 5 0 1 1 311.86 617.6" fill="#e89a1c"/>
+<text x="336.86" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">Greedy BFS</text>
+<path d="M503.92 617.6L551.92 617.6" fill="none" stroke="#9aa3ab" stroke-width="3.4" stroke-linejoin="round"/>
+<path d="M532.92 617.6A5 5 0 1 1 522.92 617.6A5 5 0 1 1 532.92 617.6" fill="#9aa3ab"/>
+<text x="557.92" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">Plain BFS</text>
+<path d="M701.77 617.6L749.77 617.6" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="3 6"/>
+<text x="755.77" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">PPV (topological)</text>
+<path d="M988.96 617.6L1036.96 617.6" fill="none" stroke="#1f2328" stroke-width="2.72" stroke-linejoin="round" stroke-dasharray="12 7"/>
+<text x="1042.96" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">sensitivity (topological)</text>
+<path d="M1344.65 617.6L1392.65 617.6" fill="none" stroke="#b3131b" stroke-width="2.4" stroke-linejoin="round"/>
+<text x="1398.65" y="626" style="font:26.24px Georgia" text-anchor="start" fill="#1f2328">value in use</text>
+</svg>
